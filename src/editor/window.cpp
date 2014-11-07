@@ -27,7 +27,7 @@ void Window::OnClick(gui::ElementPtr clickfocus, int mouseX, int mouseY, bool ho
         isSelecting = false;
     }
     if(focus && focus->text.font) MoveSelectionCursor(focus->text.font->GetUnitIndex(focus->text.text, mouseX - focus->rect.x0), holdingShift);
-    if(focus && focus->onClick) focus->onClick();
+    if(focus && focus->onClick) focus->onClick(mouseX, mouseY);
 }
 
 void Window::MoveSelectionCursor(int newCursor, bool holdingShift)

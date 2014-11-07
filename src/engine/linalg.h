@@ -1,6 +1,7 @@
 #ifndef ENGINE_LINALG_H
 #define ENGINE_LINALG_H
 
+#include <cmath>
 #include <cstdint>
 
 template<class T, int M> struct vec;

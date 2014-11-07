@@ -161,7 +161,7 @@ public:
         float y1 = y0 + label->text.font->GetLineHeight();
         int index = panel->children.size();
         panel->children.push_back({{{0,0},{0,y0},{1,0},{0,y1}},label});
-        label->onClick = [this,index]() { SetSelectedIndex(index); };
+        label->onClick = [this,index](int, int) { SetSelectedIndex(index); };
     }
 
     std::function<void()> onSelectionChanged;

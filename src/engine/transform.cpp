@@ -1,7 +1,5 @@
 #include "transform.h"
 
-#include <cmath>
-
 float4 RotationQuaternion(const float3 & axisOfRotation, float angleInRadians)
 {
     return {axisOfRotation * std::sin(angleInRadians/2), std::cos(angleInRadians/2)};

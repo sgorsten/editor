@@ -6,11 +6,13 @@
     <ClInclude Include="..\..\src\engine\gl.h" />
     <ClInclude Include="..\..\src\engine\utf8.h" />
     <ClInclude Include="..\..\src\engine\transform.h" />
+    <ClInclude Include="..\..\src\engine\geometry.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\engine\font.cpp" />
     <ClCompile Include="..\..\src\engine\gl.cpp" />
     <ClCompile Include="..\..\src\engine\utf8.cpp" />
     <ClCompile Include="..\..\src\engine\transform.cpp" />
+    <ClCompile Include="..\..\src\engine\geometry.cpp" />
   </ItemGroup>
 </Project>

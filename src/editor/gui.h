@@ -63,7 +63,7 @@ namespace gui
         Rect                                                rect;
         std::vector<Child>                                  children;
 
-        std::function<void()>                               onClick;
+        std::function<void(int x, int y)>                   onClick;
         std::function<void(int dx, int dy)>                 onDrag;
         std::function<void(const std::string & text)>       onEdit;
         std::function<void(const Rect & rect)>              onDraw;        
