@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\src\editor\main.cpp" />
+    <ClCompile Include="..\..\src\editor\font.cpp" />
+    <ClCompile Include="..\..\src\editor\utf8.cpp" />
+    <ClCompile Include="..\..\src\editor\gui.cpp" />
+    <ClCompile Include="..\..\src\editor\window.cpp" />
+    <ClCompile Include="..\..\src\editor\gl.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\editor\font.h" />
+    <ClInclude Include="..\..\src\editor\utf8.h" />
+    <ClInclude Include="..\..\src\editor\gui.h" />
+    <ClInclude Include="..\..\src\editor\window.h" />
+    <ClInclude Include="..\..\src\editor\gl.h" />
+  </ItemGroup>
+</Project>

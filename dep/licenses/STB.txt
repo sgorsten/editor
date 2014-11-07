@@ -1,0 +1,3 @@
+These excellent public domain single-header libraries were authored by Sean T. Barrett.
+
+They are available at http://github.com/nothings/stb
