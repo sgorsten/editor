@@ -8,5 +8,6 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\editor\gui.h" />
     <ClInclude Include="..\..\src\editor\window.h" />
+    <ClInclude Include="..\..\src\editor\widgets.h" />
   </ItemGroup>
 </Project>

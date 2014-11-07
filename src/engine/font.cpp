@@ -21,7 +21,7 @@ Font::Font(const char * filename, int pixelHeight, bool dropShadow, uint32_t max
     // Read the font file
     stbtt_fontinfo font;
     if(!stbtt_InitFont(&font, buffer.data(), stbtt_GetFontOffsetForIndex(buffer.data(), 0))) throw std::runtime_error(filename + std::string(" is not a valid truetype font!"));
-    float scale = stbtt_ScaleForPixelHeight(&font, pixelHeight);
+    float scale = stbtt_ScaleForPixelHeight(&font, static_cast<float>(pixelHeight));
 
     // Obtain bitmaps for printable codepoints, and sort them by descending height, then descending width
     struct GlyphBitmap { int codepoint,width,height,xoff,yoff,advance,x,y; uint8_t * pixels; };
