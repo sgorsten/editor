@@ -184,7 +184,7 @@ class Editor
 {
     Window              window;      
     Font                font;
-    gl::Texture         border, edit, nssizer, wesizer;
+    gl::Texture         border, edit, sizer;
     GuiFactory          factory;
     ListControl         objectList;
     gui::ElementPtr     propertyPanel;
@@ -201,8 +201,7 @@ public:
 
         border.Load("../assets/border.png");
         edit.Load("../assets/edit.png");
-        nssizer.Load("../assets/nssizer.png");
-        wesizer.Load("../assets/wesizer.png");
+        sizer.Load("../assets/sizer.png");
 
         auto viewport = std::make_shared<gui::Element>();
         viewport->onDraw = [this](const gui::Rect & rect)
@@ -216,6 +215,7 @@ public:
             glMatrixMode(GL_PROJECTION);
             glPushMatrix();
             glLoadIdentity();
+            glOrtho(-rect.GetAspect(), rect.GetAspect(), -1, +1, -1, +1);
             glMatrixMode(GL_MODELVIEW);
             glPushMatrix();
             glLoadIdentity();
@@ -245,8 +245,8 @@ public:
         propertyPanel = std::make_shared<gui::Element>();
         auto topRightPanel = factory.AddBorder(4, &border, objectList.GetPanel());
         auto bottomRightPanel = factory.AddBorder(4, &border, propertyPanel);
-        auto rightPanel = factory.MakeNSSizer(&nssizer, topRightPanel, bottomRightPanel, 200);
-        guiRoot = factory.MakeWESizer(&wesizer, viewport, rightPanel, -400);
+        auto rightPanel = factory.MakeNSSizer(&sizer, topRightPanel, bottomRightPanel, 200);
+        guiRoot = factory.MakeWESizer(&sizer, viewport, rightPanel, -400);
     
         objectList.onSelectionChanged = [this]()
         {
@@ -284,16 +284,13 @@ public:
 
 #include <iostream>
 
-int main(int argc, char * argv[]) try
+int main(int argc, char * argv[])
 {
     glfwInit();
-    auto result = Editor().Run();
+    int result = -1;
+    try { result = Editor().Run(); }
+    catch(const std::exception & e) { std::cerr << "Unhandled exception caught: " << e.what() << std::endl; }
+    catch(...) { std::cerr << "Unknown unhandled exception caught." << std::endl; }
     glfwTerminate();
     return result;
-}
-catch(const std::exception & e)
-{
-    std::cerr << "Unhandled exception caught: " << e.what() << std::endl;
-    glfwTerminate();
-    return -1;
 }

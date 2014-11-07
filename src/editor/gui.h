@@ -22,6 +22,9 @@ namespace gui
     struct Rect
     {
         int x0,y0,x1,y1;
+        int GetWidth() const { return x1-x0; }
+        int GetHeight() const { return y1-y0; }
+        float GetAspect() const { return (float)GetWidth()/GetHeight(); }
     };
 
     struct UCoord
