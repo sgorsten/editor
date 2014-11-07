@@ -222,10 +222,40 @@ Window::Window(const char * title, int width, int height) : window(), /*context(
 
     glfwSetKeyCallback(window, [](GLFWwindow * window, int key, int scancode, int action, int mods)
     {
-        if(action == GLFW_RELEASE) return;
         auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
-        if(w->focus)
+
+        // First handle tabbing behavior
+        if(key == GLFW_KEY_TAB)
         {
+            if(action == GLFW_RELEASE) return;
+            if(w->focus)
+            {
+                auto focusIt = std::find(begin(w->tabStops), end(w->tabStops), w->focus);
+                if(focusIt == end(w->tabStops) || ++focusIt == end(w->tabStops)) w->OnClick(nullptr, 0, 0, false);
+                else
+                {
+                    w->OnClick(*focusIt, 0, 0, false);
+                    w->SelectAll();
+                }
+            }
+            if(!w->focus)
+            {
+                if(!w->tabStops.empty())
+                {
+                    w->OnClick(w->tabStops.front(), 0, 0, false);
+                    w->SelectAll();
+                }
+            }
+            return;
+        }
+
+        // All remaining keys apply to current "focus" element
+        if(!w->focus) return;
+
+        // If element is editable, keypressed apply to text editing behavior only
+        if(w->focus->text.isEditable)
+        {
+            if(action == GLFW_RELEASE) return;
             if(mods & GLFW_MOD_CONTROL) switch(key)
             {
             case GLFW_KEY_A:
@@ -289,32 +319,12 @@ Window::Window(const char * title, int width, int height) : window(), /*context(
                 }
                 break;
             }
+            return;
         }
-
-        switch(key)
-        {
-        case GLFW_KEY_TAB:
-            if(w->focus)
-            {
-                auto focusIt = std::find(begin(w->tabStops), end(w->tabStops), w->focus);
-                if(focusIt == end(w->tabStops) || ++focusIt == end(w->tabStops)) w->OnClick(nullptr, 0, 0, false);
-                else
-                {
-                    w->OnClick(*focusIt, 0, 0, false);
-                    w->SelectAll();
-                }
-            }
-            if(!w->focus)
-            {
-                if(!w->tabStops.empty())
-                {
-                    w->OnClick(w->tabStops.front(), 0, 0, false);
-                    w->SelectAll();
-                }
-            }
-            break;
-        }
-    });    
+            
+        // Finally, dispatch to custom key handler if one is present
+        if(w->focus->onKey) w->focus->onKey(key, action, mods);
+    });
 }
 
 Window::~Window()

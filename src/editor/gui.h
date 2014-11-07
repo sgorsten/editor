@@ -57,20 +57,22 @@ namespace gui
             bool isEditable;
         };
 
-        Cursor                                          cursor;
-        BackgroundComponent                             back;
-        TextComponent                                   text;
-        Rect                                            rect;
-        std::vector<Child>                              children;
+        Cursor                                              cursor;
+        BackgroundComponent                                 back;
+        TextComponent                                       text;
+        Rect                                                rect;
+        std::vector<Child>                                  children;
 
-        std::function<void()>                           onClick;
-        std::function<void(int dx, int dy)>             onDrag;
-        std::function<void(const std::string & text)>   onEdit;
-        std::function<void(const Rect & rect)>          onDraw;        
+        std::function<void()>                               onClick;
+        std::function<void(int dx, int dy)>                 onDrag;
+        std::function<void(const std::string & text)>       onEdit;
+        std::function<void(const Rect & rect)>              onDraw;        
+
+        std::function<void(int key, int action, int mods)>  onKey;
         
-                                                        Element();
+                                                            Element();
 
-        void                                            SetRect(const Rect & rect);
+        void                                                SetRect(const Rect & rect);
     };
 
     typedef std::shared_ptr<Element> ElementPtr;
