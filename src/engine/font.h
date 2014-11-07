@@ -1,5 +1,5 @@
-#ifndef EDITOR_FONT_H
-#define EDITOR_FONT_H
+#ifndef ENGINE_FONT_H
+#define ENGINE_FONT_H
 
 #include "gl.h"
 

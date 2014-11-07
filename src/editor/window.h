@@ -2,8 +2,8 @@
 #define EDITOR_WINDOW_H
 
 #include "gui.h"
-#include "font.h"
-#include "utf8.h"
+#include "engine/font.h"
+#include "engine/utf8.h"
 
 #include <algorithm>
 #include <sstream>

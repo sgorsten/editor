@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="..\..\src\engine\linalg.h" />
+    <ClInclude Include="..\..\src\engine\font.h" />
+    <ClInclude Include="..\..\src\engine\gl.h" />
+    <ClInclude Include="..\..\src\engine\utf8.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\engine\font.cpp" />
+    <ClCompile Include="..\..\src\engine\gl.cpp" />
+    <ClCompile Include="..\..\src\engine\utf8.cpp" />
+  </ItemGroup>
+</Project>

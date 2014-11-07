@@ -1,5 +1,5 @@
-#ifndef EDITOR_GL_H
-#define EDITOR_GL_H
+#ifndef ENGINE_GL_H
+#define ENGINE_GL_H
 
 #include <GLFW/glfw3.h>
 

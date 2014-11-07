@@ -1,5 +1,5 @@
 #include "gui.h"
-#include "gl.h"
+#include "engine/gl.h"
 
 namespace gui
 {

@@ -1,5 +1,5 @@
-#ifndef EDITOR_UTF8_H
-#define EDITOR_UTF8_H
+#ifndef ENGINE_UTF8_H
+#define ENGINE_UTF8_H
 
 #include <cstdint>
 #include <array>

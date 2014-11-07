@@ -1,13 +1,13 @@
-﻿#include "font.h"
-#include "gui.h"
+﻿#include "gui.h"
 #include "window.h"
-#include "gl.h"
+
+#include "engine/gl.h"
+#include "engine/font.h"
+#include "engine/linalg.h"
 
 #include <vector>
 #include <algorithm>
 #include <sstream>
-
-struct float3 { float x,y,z; };
 
 class GuiFactory
 {

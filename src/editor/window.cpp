@@ -1,5 +1,5 @@
 #include "window.h"
-#include "gl.h"
+#include "engine/gl.h"
 
 gui::ElementPtr GetElement(const gui::ElementPtr & element, int x, int y)
 {
