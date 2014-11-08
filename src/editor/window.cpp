@@ -459,13 +459,12 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
 	        nvgFillColor(vg, parentBackground);
 	        nvgFill(vg);
 
-            // Fill boundary
-            nvgBeginPath(vg);
-            nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 5.5f);
-            nvgRoundedRect(vg, elem.rect.x0+2.5f, elem.rect.y0+2.5f, elem.rect.GetWidth()-5, elem.rect.GetHeight()-5, 3.5f);
-            nvgPathWinding(vg, NVG_HOLE);
-            nvgFillColor(vg, nvgRGBA(0,0,0,192));
-            nvgFill(vg);
+            // Stroke an outline for the box
+	        nvgBeginPath(vg);
+	        nvgRoundedRect(vg, elem.rect.x0+1.5f, elem.rect.y0+1.5f, elem.rect.GetWidth()-3, elem.rect.GetHeight()-3, 4.5f);
+	        nvgStrokeColor(vg, nvgRGBA(0,0,0,192));
+            nvgStrokeWidth(vg, 2);
+	        nvgStroke(vg);
             break;
         case gui::EDIT:
             // Restore corners of background
@@ -476,17 +475,11 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
 	        nvgFillColor(vg, parentBackground);
 	        nvgFill(vg);
 
-            // Draw a drop-shadow inside the box
-            auto bg = nvgBoxGradient(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 2, 4, nvgRGBA(67,67,67,0), nvgRGBA(67,67,67,255));
-	        nvgBeginPath(vg);
-	        nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 2);
-	        nvgFillPaint(vg, bg);
-	        nvgFill(vg);
-
             // Stroke an outline for the box
 	        nvgBeginPath(vg);
 	        nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 2.5f);
 	        nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
+            nvgStrokeWidth(vg, 1);
 	        nvgStroke(vg);
             break;
         }
