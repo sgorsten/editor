@@ -10,25 +10,31 @@
 #include <algorithm>
 #include <sstream>
 
+struct Vertex
+{
+    float3 position, normal;
+    void Draw() const
+    {
+        glNormal(normal);
+        glVertex(position);
+    }
+};
+
 struct Mesh
 {
-    std::vector<float3> vertices;
+    std::vector<Vertex> vertices;
     std::vector<uint3> triangles;
 
-    bool Hit(const Ray & ray) const
-    {
-        for(auto & tri : triangles) if(IntersectRayTriangle(ray, vertices[tri.x], vertices[tri.y], vertices[tri.z]).hit) return true;
-        return false;
-    }
+    RayMeshHit Hit(const Ray & ray) const { return IntersectRayMesh(ray, vertices.data(), &Vertex::position, triangles.data(), triangles.size()); }
 
     void Draw() const
     {
         glBegin(GL_TRIANGLES);
         for(auto & tri : triangles)
         {
-            glVertex(vertices[tri.x]);
-            glVertex(vertices[tri.y]);
-            glVertex(vertices[tri.z]);
+            vertices[tri.x].Draw();
+            vertices[tri.y].Draw();
+            vertices[tri.z].Draw();
         }
         glEnd();
     }
@@ -41,7 +47,7 @@ struct Object
     float3 color;
     const Mesh * mesh;
 
-    bool Hit(const Ray & ray) const
+    RayMeshHit Hit(const Ray & ray) const
     {
         return mesh->Hit({ray.start-position,ray.direction});
     }
@@ -62,8 +68,18 @@ struct Scene
 
     Object * Hit(const Ray & ray)
     {
-        for(auto & obj : objects) if(obj.Hit(ray)) return &obj;
-        return nullptr;
+        Object * best = nullptr;
+        float bestT = 0;
+        for(auto & obj : objects)
+        {
+            auto hit = obj.Hit(ray);
+            if(hit.hit && (!best || hit.t < bestT))
+            {
+                best = &obj;
+                bestT = hit.t;
+            }
+        }
+        return best;
     }
 
     void Draw() const
@@ -72,14 +88,33 @@ struct Scene
     }
 };
 
+struct Selection
+{
+    Object * object;
+
+    Selection() : object() {}
+
+    void SetSelection(Object * object)
+    {
+        if(object != this->object)
+        {
+            this->object = object; 
+            if(onSelectionChanged) onSelectionChanged();
+        }
+    }
+    
+    std::function<void()> onSelectionChanged;
+};
+
 struct View
 {
     Scene & scene;
+    Selection & selection;
     Pose viewpoint;
     float yaw=0,pitch=0;
     bool bf=0,bl=0,bb=0,br=0;
 
-    View(Scene & scene) : scene(scene) {}
+    View(Scene & scene, Selection & selection) : scene(scene), selection(selection) {}
 
     void OnUpdate(float timestep)
     {
@@ -117,14 +152,38 @@ struct View
         glEnable(GL_SCISSOR_TEST);
         glClearColor(0,0,1,1);
         glClear(GL_COLOR_BUFFER_BIT);
+
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
-        glLoad(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.1f, 8.0f));
+        glLoad(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f));
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
         glLoad(viewpoint.Inverse().Matrix());
 
+        float pos[] = {0.2f,1,0.3f,0}, ambient[] = {0.5f,0.5f,0.5f,1.0f};
+        glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glLightfv(GL_LIGHT0, GL_POSITION, pos);
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient);
+        glEnable(GL_COLOR_MATERIAL);
+
+        glEnable(GL_DEPTH_TEST);
+
         scene.Draw();
+
+        if(selection.object)
+        {
+            glPushMatrix();
+            glMult(TranslationMatrix(selection.object->position));
+            glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+            glDepthFunc(GL_LEQUAL);
+            glEnable(GL_POLYGON_OFFSET_LINE);
+            glPolygonOffset(-1, -1);
+            glDisable(GL_LIGHTING);
+            glColor3f(1,1,1);
+            selection.object->mesh->Draw();
+            glPopMatrix();
+        }
         
         glPopMatrix();
         glMatrixMode(GL_PROJECTION);
@@ -142,14 +201,11 @@ struct View
             auto viewX = (x - rect.x0) * 2.0f / rect.GetWidth() - 1;
             auto viewY = 1 - (y - rect.y0) * 2.0f / rect.GetHeight();
 
-            auto mat = inv(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.1f, 8.0f));
+            auto mat = inv(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f));
             auto p0 = mul(mat, float4(viewX, viewY, -1, 1)), p1 = mul(mat, float4(viewX, viewY, 1, 1));
             Ray ray = viewpoint * Ray::Between(p0.xyz()/p0.w, p1.xyz()/p1.w);
             
-            if(auto obj = scene.Hit(ray))
-            {
-                obj->color = float3(1,1,1) - obj->color;
-            }
+            if(auto obj = scene.Hit(ray)) selection.SetSelection(obj);
         };
         viewport->onDrag = [this](int dx, int dy) { OnDrag(dx, dy); };
         viewport->onKey = [this](int key, int action, int mods) { OnKey(key, action, mods); };
@@ -157,6 +213,21 @@ struct View
         return viewport;
     }
 };
+
+Mesh MakeBox(const float3 & halfDims)
+{
+    Mesh mesh = {
+        {{{+1,-1,-1},{+1,0,0}}, {{+1,+1,-1},{+1,0,0}}, {{+1,+1,+1},{+1,0,0}}, {{+1,-1,+1},{+1,0,0}},
+         {{-1,+1,-1},{-1,0,0}}, {{-1,-1,-1},{-1,0,0}}, {{-1,-1,+1},{-1,0,0}}, {{-1,+1,+1},{-1,0,0}},
+         {{-1,+1,-1},{0,+1,0}}, {{-1,+1,+1},{0,+1,0}}, {{+1,+1,+1},{0,+1,0}}, {{+1,+1,-1},{0,+1,0}},
+         {{-1,-1,+1},{0,-1,0}}, {{-1,-1,-1},{0,-1,0}}, {{+1,-1,-1},{0,-1,0}}, {{+1,-1,+1},{0,-1,0}},
+         {{-1,-1,+1},{0,0,+1}}, {{+1,-1,+1},{0,0,+1}}, {{+1,+1,+1},{0,0,+1}}, {{-1,+1,+1},{0,0,+1}},
+         {{+1,-1,-1},{0,0,-1}}, {{-1,-1,-1},{0,0,-1}}, {{-1,+1,-1},{0,0,-1}}, {{+1,+1,-1},{0,0,-1}}},
+        {{{0,1,2}, {0,2,3}, {4,5,6}, {4,6,7}, {8,9,10}, {8,10,11}, {12,13,14}, {12,14,15}, {16,17,18}, {16,18,19}, {20,21,22}, {20,22,23}}}
+    };
+    for(auto & vert : mesh.vertices) vert.position *= halfDims;
+    return mesh;
+}
 
 class Editor
 {
@@ -166,22 +237,23 @@ class Editor
     ListControl         objectList;
     gui::ElementPtr     propertyPanel;
     gui::ElementPtr     guiRoot;
-    Mesh                mesh;
+    Mesh                mesh,ground;
 
     Scene               scene;
+    Selection           selection;
     View                view;
 public:
-    Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), view(scene)
+    Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), view(scene, selection)
     {
-        mesh = {
-            {{-0.1f,-0.1f,0}, {+0.1f,-0.1f,0}, {+0.1f,+0.1f,0}, {-0.1f,+0.1f,0}},
-            {{0,1,2}, {0,2,3}}
-        };
+        mesh = MakeBox({0.5f,0.5f,0.5f});
+        ground = MakeBox({4,0.1f,4});
         scene.objects = {
-            {"Alpha",{-1,-1,-5},{1,0,0},&mesh},
-            {"Beta", {+1,-1,-5},{0,1,0},&mesh},
-            {"Gamma",{ 0,+1,-5},{1,1,0},&mesh}
+            {"Ground",{0,-0.1f,0},{0.4f,0.4f,0.4f},&ground},
+            {"Alpha",{-0.6f,0.5f,0},{1,0,0},&mesh},
+            {"Beta", {+0.6f,0.5f,0},{0,1,0},&mesh},
+            {"Gamma",{ 0.0f,1.5f,0},{1,1,0},&mesh}
         };
+        view.viewpoint.position = {0,1,4};
 
         for(auto & obj : scene.objects)
         {
@@ -194,25 +266,30 @@ public:
         auto rightPanel = factory.MakeNSSizer(topRightPanel, bottomRightPanel, 200);
         guiRoot = factory.MakeWESizer(view.CreateViewport(factory), rightPanel, -400);
     
-        objectList.onSelectionChanged = [this]()
+        selection.onSelectionChanged = [this]()
         {
-            int selectedIndex = objectList.GetSelectedIndex();
-            auto & obj = scene.objects[selectedIndex];
+            objectList.SetSelectedIndex(selection.object ? selection.object - scene.objects.data() : -1);
 
             std::vector<std::pair<std::string, gui::ElementPtr>> props;
-            props.push_back({"Name", factory.MakeEdit(obj.name, [this](const std::string & text)
+            if(selection.object)
             {
-                int selectedIndex = objectList.GetSelectedIndex();
-                scene.objects[selectedIndex].name = text;
-                objectList.GetPanel()->children[selectedIndex].element->text.text = text;                
-            })});
-            props.push_back({"Position", factory.MakeVectorEdit(obj.position)});
-            props.push_back({"Color", factory.MakeVectorEdit(obj.color)});
-
+                auto & obj = *selection.object;
+                props.push_back({"Name", factory.MakeEdit(obj.name, [this](const std::string & text)
+                {
+                    int selectedIndex = objectList.GetSelectedIndex();
+                    scene.objects[selectedIndex].name = text;
+                    objectList.GetPanel()->children[selectedIndex].element->text.text = text;                
+                })});
+                props.push_back({"Position", factory.MakeVectorEdit(obj.position)});
+                props.push_back({"Color", factory.MakeVectorEdit(obj.color)});
+            }
             propertyPanel->children = {{{{0,0},{0,0},{1,0},{1,0}}, factory.MakePropertyMap(props)}};
+
             window.RefreshLayout();
         };
-        objectList.SetSelectedIndex(0);
+        objectList.onSelectionChanged = [this]() { selection.SetSelection(&scene.objects[objectList.GetSelectedIndex()]); };
+
+        selection.onSelectionChanged();
 
         window.SetGuiRoot(guiRoot);
     }

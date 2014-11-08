@@ -27,6 +27,7 @@ namespace gl
 inline void glVertex(const float2 & vertex) { glVertex2fv(&vertex.x); }
 inline void glVertex(const float3 & vertex) { glVertex3fv(&vertex.x); }
 inline void glVertex(const float4 & vertex) { glVertex4fv(&vertex.x); }
+inline void glNormal(const float3 & normal) { glNormal3fv(&normal.x); }
 inline void glColor(const float3 & color) { glColor3fv(&color.x); }
 inline void glColor(const float4 & color) { glColor4fv(&color.x); }
 inline void glLoad(const float4x4 & matrix) { glLoadMatrixf(&matrix.x.x); }
