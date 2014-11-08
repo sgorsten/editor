@@ -373,42 +373,41 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
     }
     else
     {
+        // Compute the background color for this element
         NVGcolor background = parentBackground;
-
-        if(elem.style != gui::NONE)
-        {
-            NVGpaint bg;
-            switch(elem.style)
-            {
-            case gui::BACKGROUND:
-                nvgBeginPath(vg);
-                nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-                nvgFillColor(vg, background = nvgRGBA(64,64,64,255));
-                nvgFill(vg);
-                background = nvgRGBA(64,64,64,255);
-                break;
-            case gui::BORDER:
-                nvgBeginPath(vg);
-                nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-                nvgFillColor(vg, background = nvgRGBA(64,64,64,255));
-                nvgFill(vg);
-
-                nvgBeginPath(vg);
-                nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 5.5f);
-                nvgRoundedRect(vg, elem.rect.x0+2.5f, elem.rect.y0+2.5f, elem.rect.GetWidth()-5, elem.rect.GetHeight()-5, 3.5f);
-                nvgPathWinding(vg, NVG_HOLE);
-                nvgFillColor(vg, nvgRGBA(0,0,0,192));
-                nvgFill(vg);
-                break;
-            }
+        int minSize = 0;
+        switch(elem.style)
+        {    
+        case gui::BORDER:
+            minSize = 12;
+        case gui::BACKGROUND:
+            background = nvgRGBA(64,64,64,255);
+            break;
+        case gui::EDIT:
+            background = nvgRGBA(88,88,88,255);
+            minSize = 6;
+            break;
         }
 
+        // If it differs from the parent element, fill the client area with the new background color
+        if(memcmp(&background, &parentBackground, sizeof(background)))
+        {
+            if((elem.rect.GetWidth() < minSize || elem.rect.GetHeight() < minSize) && parentBackground.a != 0) return;
+            nvgBeginPath(vg);
+            nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+	        nvgFillColor(vg, background);
+	        nvgFill(vg);
+        }
+        if(parentBackground.a == 0) parentBackground = background; // If there was no parent color, reuse this color
+
+        // Begin scissoring to client rect
+    	nvgSave(vg);
+	    nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+
+        // If we have an assigned font, handle rendering of text component
         if(elem.text.font)
         {
             const auto & font = *elem.text.font;
-
-    	    nvgSave(vg);
-	        nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
 
             if(&elem == focus && selectLeft < selectRight)
             {
@@ -433,37 +432,42 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
                 nvgFill(vg);
             }
 
-            nvgRestore(vg);
-
             auto transparentBackground = parentBackground;
             transparentBackground.a = 0;
             auto bg = nvgLinearGradient(vg, elem.rect.x1-6, elem.rect.y0, elem.rect.x1, elem.rect.y0, transparentBackground, parentBackground);
             nvgBeginPath(vg);
-            nvgRect(vg, elem.rect.x1-6, elem.rect.y0, 12, font.GetLineHeight());
+            nvgRect(vg, elem.rect.x1-6, elem.rect.y0, 6, font.GetLineHeight());
             nvgFillPaint(vg, bg);
             nvgFill(vg);
         }
 
-        if(elem.style == gui::EDIT)
-        {
-            nvgBeginPath(vg);
-            nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-	        nvgFillColor(vg, background = nvgRGBA(88,88,88,255));
-	        nvgFill(vg);
-
-    	    nvgSave(vg);
-	        nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-        }
-
+        // Draw children in back-to-front order
         for(const auto & child : elem.children)
         {
             DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight, background);
         }
 
-        if(elem.style == gui::EDIT)
+        // Render border effects after all children have been finished
+        switch(elem.style)
         {
-            nvgRestore(vg);
+        case gui::BORDER:
+            // Restore corners of background
+            nvgBeginPath(vg);
+            nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+            nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 5.0f);
+            nvgPathWinding(vg, NVG_HOLE);
+	        nvgFillColor(vg, parentBackground);
+	        nvgFill(vg);
 
+            // Fill boundary
+            nvgBeginPath(vg);
+            nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 5.5f);
+            nvgRoundedRect(vg, elem.rect.x0+2.5f, elem.rect.y0+2.5f, elem.rect.GetWidth()-5, elem.rect.GetHeight()-5, 3.5f);
+            nvgPathWinding(vg, NVG_HOLE);
+            nvgFillColor(vg, nvgRGBA(0,0,0,192));
+            nvgFill(vg);
+            break;
+        case gui::EDIT:
             // Restore corners of background
             nvgBeginPath(vg);
             nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
@@ -484,7 +488,10 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
 	        nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 2.5f);
 	        nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
 	        nvgStroke(vg);
+            break;
         }
+
+        nvgRestore(vg);
     }
 }
 
@@ -507,7 +514,8 @@ void Window::Redraw()
     glLoadIdentity();
 
     nvgBeginFrame(vg, width, height, 1.0f);
-    DrawElement(vg, *root, focus.get(), cursor, isSelecting ? GetSelectionLeftIndex() : 0, isSelecting ? GetSelectionRightIndex() : 0, nvgRGBA(0,0,0,255));
+
+    DrawElement(vg, *root, focus.get(), cursor, isSelecting ? GetSelectionLeftIndex() : 0, isSelecting ? GetSelectionRightIndex() : 0, nvgRGBA(0,0,0,0));
     nvgEndFrame(vg);
 
     glPopMatrix();
