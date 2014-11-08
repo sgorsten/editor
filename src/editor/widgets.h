@@ -69,7 +69,7 @@ public:
         return panel;
     }
 
-    gui::ElementPtr MakeNSSizer(const gl::Texture * image, gui::ElementPtr top, gui::ElementPtr bottom, int split)
+    gui::ElementPtr MakeNSSizer(gui::ElementPtr top, gui::ElementPtr bottom, int split)
     {
         auto panel = std::make_shared<gui::Element>();
         auto weak = std::weak_ptr<gui::Element>(panel);
@@ -89,7 +89,7 @@ public:
             }
         };
 
-        int height = image->GetHeight();
+        int height = 4;
         if(split > 0) panel->children.push_back({{{0,0},{0,split},{1,0},{0,split+height}}, sizer});
         if(split < 0) panel->children.push_back({{{0,0},{1,split-height},{1,0},{1,split}}, sizer});
         if(split == 0) panel->children.push_back({{{0,0},{0.5,-height*0.5f},{1,0},{0.5,height*0.5f}}, sizer});
@@ -98,7 +98,7 @@ public:
         return panel;
     }
 
-    gui::ElementPtr MakeWESizer(const gl::Texture * image, gui::ElementPtr left, gui::ElementPtr right, int split)
+    gui::ElementPtr MakeWESizer(gui::ElementPtr left, gui::ElementPtr right, int split)
     {
         auto panel = std::make_shared<gui::Element>();
         auto weak = std::weak_ptr<gui::Element>(panel);
@@ -118,7 +118,7 @@ public:
             }
         };
 
-        int width = image->GetWidth();
+        int width = 4;
         if(split > 0) panel->children.push_back({{{0,split},{0,0},{0,split+width},{1,0}}, sizer});
         if(split < 0) panel->children.push_back({{{1,split-width},{0,0},{1,split},{1,0}}, sizer});
         if(split == 0) panel->children.push_back({{{0.5,-width*0.5f},{0,0},{0.5,width*0.5f},{1,0}}, sizer});

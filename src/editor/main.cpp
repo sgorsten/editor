@@ -162,7 +162,6 @@ class Editor
 {
     Window              window;      
     Font                font;
-    gl::Texture         border, edit, sizer;
     GuiFactory          factory;
     ListControl         objectList;
     gui::ElementPtr     propertyPanel;
@@ -172,7 +171,7 @@ class Editor
     Scene               scene;
     View                view;
 public:
-    Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "C:/windows/fonts/arialbd.ttf", 16, true, 0x500), factory(font, 2), view(scene)
+    Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), view(scene)
     {
         mesh = {
             {{-0.1f,-0.1f,0}, {+0.1f,-0.1f,0}, {+0.1f,+0.1f,0}, {-0.1f,+0.1f,0}},
@@ -184,10 +183,6 @@ public:
             {"Gamma",{ 0,+1,-5},{1,1,0},&mesh}
         };
 
-        border.Load("../assets/border.png");
-        edit.Load("../assets/edit.png");
-        sizer.Load("../assets/sizer.png");
-
         for(auto & obj : scene.objects)
         {
             objectList.AddItem(factory, obj.name);
@@ -196,8 +191,8 @@ public:
         propertyPanel = std::make_shared<gui::Element>();
         auto topRightPanel = factory.AddBorder(4, gui::BORDER, objectList.GetPanel());
         auto bottomRightPanel = factory.AddBorder(4, gui::BORDER, propertyPanel);
-        auto rightPanel = factory.MakeNSSizer(&sizer, topRightPanel, bottomRightPanel, 200);
-        guiRoot = factory.MakeWESizer(&sizer, view.CreateViewport(factory), rightPanel, -400);
+        auto rightPanel = factory.MakeNSSizer(topRightPanel, bottomRightPanel, 200);
+        guiRoot = factory.MakeWESizer(view.CreateViewport(factory), rightPanel, -400);
     
         objectList.onSelectionChanged = [this]()
         {
