@@ -365,7 +365,7 @@ void Window::SetGuiRoot(gui::ElementPtr element)
     RefreshLayout();
 }
 
-static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * focus, size_t cursorIndex, size_t selectLeft, size_t selectRight)
+static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * focus, size_t cursorIndex, size_t selectLeft, size_t selectRight, NVGcolor parentBackground)
 {
     if(elem.onDraw)
     {
@@ -373,8 +373,8 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
     }
     else
     {
-	    nvgSave(vg);
-	    nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+        NVGcolor background = parentBackground;
+
         if(elem.style != gui::NONE)
         {
             NVGpaint bg;
@@ -383,13 +383,14 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
             case gui::BACKGROUND:
                 nvgBeginPath(vg);
                 nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-                nvgFillColor(vg, nvgRGBA(64,64,64,255));
+                nvgFillColor(vg, background = nvgRGBA(64,64,64,255));
                 nvgFill(vg);
+                background = nvgRGBA(64,64,64,255);
                 break;
             case gui::BORDER:
                 nvgBeginPath(vg);
                 nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-                nvgFillColor(vg, nvgRGBA(64,64,64,255));
+                nvgFillColor(vg, background = nvgRGBA(64,64,64,255));
                 nvgFill(vg);
 
                 nvgBeginPath(vg);
@@ -399,22 +400,15 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
                 nvgFillColor(vg, nvgRGBA(0,0,0,192));
                 nvgFill(vg);
                 break;
-            case gui::EDIT:
-                bg = nvgBoxGradient(vg, elem.rect.x0+1, elem.rect.y0+1+1.5f, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 3, 4, nvgRGBA(88,88,88,255), nvgRGBA(67,67,67,255));
-	            nvgBeginPath(vg);
-	            nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 3-1);
-	            nvgFillPaint(vg, bg);
-	            nvgFill(vg);
-                break;
             }
         }
 
         if(elem.text.font)
         {
-	        nvgSave(vg);
-	        nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-
             const auto & font = *elem.text.font;
+
+    	    nvgSave(vg);
+	        nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
 
             if(&elem == focus && selectLeft < selectRight)
             {
@@ -437,36 +431,60 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
                 nvgRect(vg, x, elem.rect.y0, 1, font.GetLineHeight());
                 nvgFillColor(vg, nvgRGBA(255,255,255,192));
                 nvgFill(vg);
-
-	            nvgBeginPath(vg);
-	            nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 3-0.5f);
-	            nvgStrokeColor(vg, nvgRGBA(0,0,0,48));
-	            nvgStroke(vg);
             }
 
             nvgRestore(vg);
-        }
 
-        for(const auto & child : elem.children)
-        {
-            DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight);
+            auto transparentBackground = parentBackground;
+            transparentBackground.a = 0;
+            auto bg = nvgLinearGradient(vg, elem.rect.x1-6, elem.rect.y0, elem.rect.x1, elem.rect.y0, transparentBackground, parentBackground);
+            nvgBeginPath(vg);
+            nvgRect(vg, elem.rect.x1-6, elem.rect.y0, 12, font.GetLineHeight());
+            nvgFillPaint(vg, bg);
+            nvgFill(vg);
         }
 
         if(elem.style == gui::EDIT)
         {
-            auto fadePaint = nvgLinearGradient(vg, elem.rect.x1-8, elem.rect.y0, elem.rect.x1-2, elem.rect.y0, nvgRGBA(88,88,88,0), nvgRGBA(88,88,88,255));
-	        nvgBeginPath(vg);
-	        nvgRect(vg, elem.rect.x1-8, elem.rect.y0+2, 7, elem.rect.GetHeight()-4);
-	        nvgFillPaint(vg, fadePaint);
+            nvgBeginPath(vg);
+            nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+	        nvgFillColor(vg, background = nvgRGBA(88,88,88,255));
 	        nvgFill(vg);
 
+    	    nvgSave(vg);
+	        nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+        }
+
+        for(const auto & child : elem.children)
+        {
+            DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight, background);
+        }
+
+        if(elem.style == gui::EDIT)
+        {
+            nvgRestore(vg);
+
+            // Restore corners of background
+            nvgBeginPath(vg);
+            nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+            nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 2);
+            nvgPathWinding(vg, NVG_HOLE);
+	        nvgFillColor(vg, parentBackground);
+	        nvgFill(vg);
+
+            // Draw a drop-shadow inside the box
+            auto bg = nvgBoxGradient(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 2, 4, nvgRGBA(67,67,67,0), nvgRGBA(67,67,67,255));
 	        nvgBeginPath(vg);
-	        nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 3-0.5f);
+	        nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 2);
+	        nvgFillPaint(vg, bg);
+	        nvgFill(vg);
+
+            // Stroke an outline for the box
+	        nvgBeginPath(vg);
+	        nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 2.5f);
 	        nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
 	        nvgStroke(vg);
         }
-
-        nvgRestore(vg);
     }
 }
 
@@ -489,7 +507,7 @@ void Window::Redraw()
     glLoadIdentity();
 
     nvgBeginFrame(vg, width, height, 1.0f);
-    DrawElement(vg, *root, focus.get(), cursor, isSelecting ? GetSelectionLeftIndex() : 0, isSelecting ? GetSelectionRightIndex() : 0);
+    DrawElement(vg, *root, focus.get(), cursor, isSelecting ? GetSelectionLeftIndex() : 0, isSelecting ? GetSelectionRightIndex() : 0, nvgRGBA(0,0,0,255));
     nvgEndFrame(vg);
 
     glPopMatrix();
