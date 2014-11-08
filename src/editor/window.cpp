@@ -76,6 +76,7 @@ void Window::Insert(const char * text)
 
 Window::Window(const char * title, int width, int height) : window(), width(width), height(height), focus(), isSelecting(), vg()
 {
+    glfwWindowHint(GLFW_STENCIL_BITS, 8);
     window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     glfwSetWindowUserPointer(window, this);
     glfwMakeContextCurrent(window);
@@ -372,6 +373,8 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
     }
     else
     {
+	    nvgSave(vg);
+	    nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
         if(elem.style != gui::NONE)
         {
             NVGpaint bg;
@@ -390,29 +393,27 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
                 nvgFill(vg);
 
                 nvgBeginPath(vg);
-                nvgRoundedRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight(), 6);
-                nvgRoundedRect(vg, elem.rect.x0+2, elem.rect.y0+2, elem.rect.GetWidth()-4, elem.rect.GetHeight()-4, 4);
+                nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 5.5f);
+                nvgRoundedRect(vg, elem.rect.x0+2.5f, elem.rect.y0+2.5f, elem.rect.GetWidth()-5, elem.rect.GetHeight()-5, 3.5f);
                 nvgPathWinding(vg, NVG_HOLE);
-                nvgFillColor(vg, nvgRGBA(0,0,0,255));
+                nvgFillColor(vg, nvgRGBA(0,0,0,192));
                 nvgFill(vg);
                 break;
             case gui::EDIT:
-                bg = nvgBoxGradient(vg, elem.rect.x0+1, elem.rect.y0+1+1.5f, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 3, 4, nvgRGBA(255,255,255,32), nvgRGBA(32,32,32,32));
+                bg = nvgBoxGradient(vg, elem.rect.x0+1, elem.rect.y0+1+1.5f, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 3, 4, nvgRGBA(88,88,88,255), nvgRGBA(67,67,67,255));
 	            nvgBeginPath(vg);
 	            nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 3-1);
 	            nvgFillPaint(vg, bg);
 	            nvgFill(vg);
-
-	            nvgBeginPath(vg);
-	            nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 3-0.5f);
-	            nvgStrokeColor(vg, nvgRGBA(0,0,0,48));
-	            nvgStroke(vg);
                 break;
             }
         }
 
         if(elem.text.font)
         {
+	        nvgSave(vg);
+	        nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+
             const auto & font = *elem.text.font;
 
             if(&elem == focus && selectLeft < selectRight)
@@ -436,13 +437,36 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
                 nvgRect(vg, x, elem.rect.y0, 1, font.GetLineHeight());
                 nvgFillColor(vg, nvgRGBA(255,255,255,192));
                 nvgFill(vg);
-            }
-        }
-    }
 
-    for(const auto & child : elem.children)
-    {
-        DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight);
+	            nvgBeginPath(vg);
+	            nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 3-0.5f);
+	            nvgStrokeColor(vg, nvgRGBA(0,0,0,48));
+	            nvgStroke(vg);
+            }
+
+            nvgRestore(vg);
+        }
+
+        for(const auto & child : elem.children)
+        {
+            DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight);
+        }
+
+        if(elem.style == gui::EDIT)
+        {
+            auto fadePaint = nvgLinearGradient(vg, elem.rect.x1-8, elem.rect.y0, elem.rect.x1-2, elem.rect.y0, nvgRGBA(88,88,88,0), nvgRGBA(88,88,88,255));
+	        nvgBeginPath(vg);
+	        nvgRect(vg, elem.rect.x1-8, elem.rect.y0+2, 7, elem.rect.GetHeight()-4);
+	        nvgFillPaint(vg, fadePaint);
+	        nvgFill(vg);
+
+	        nvgBeginPath(vg);
+	        nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 3-0.5f);
+	        nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
+	        nvgStroke(vg);
+        }
+
+        nvgRestore(vg);
     }
 }
 
