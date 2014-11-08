@@ -6,15 +6,14 @@
 class GuiFactory
 {
     const Font & font;
-    int spacing;
-    gui::Element::BackgroundComponent editBorder;
+    int spacing, editBorder;
 public:
-    GuiFactory(const Font & font, int spacing, gui::Element::BackgroundComponent editBorder) : font(font), spacing(spacing), editBorder(editBorder) {}
+    GuiFactory(const Font & font, int spacing) : font(font), spacing(spacing), editBorder(2) {}
 
-    gui::ElementPtr AddBorder(int pixels, const gl::Texture * texture, gui::ElementPtr inner) const
+    gui::ElementPtr AddBorder(int pixels, gui::Style style, gui::ElementPtr inner) const
     {
         auto panel = std::make_shared<gui::Element>();
-        panel->back = {texture,pixels};
+        panel->style = style;
         panel->children.push_back({{{0,pixels},{0,pixels},{1,-pixels},{1,-pixels}},inner});
         return panel;
     }
@@ -31,9 +30,9 @@ public:
         auto panel = std::make_shared<gui::Element>();
         for(auto & pair : properties)
         {
-            int y1 = y0 + editBorder.border;
+            int y1 = y0 + editBorder;
             int y2 = y1 + font.GetLineHeight();
-            int y3 = y2 + editBorder.border;
+            int y3 = y2 + editBorder;
             panel->children.push_back({{{0,0},{0,y1},{0.5,-spacing*0.5f},{0,y2}}, MakeLabel(pair.first)});
             panel->children.push_back({{{0.5,spacing*0.5f},{0,y0},{1,0},{0,y3}}, pair.second});
             y0 = y3 + spacing;
@@ -47,7 +46,7 @@ public:
         elem->cursor = gui::Cursor::IBeam;
         elem->text = {{1,1,1,1}, &font, text, true};
         elem->onEdit = onEdit;
-        return AddBorder(editBorder.border, editBorder.image, elem);
+        return AddBorder(editBorder, gui::EDIT, elem);
     }
     gui::ElementPtr MakeStringEdit(std::string & value) const
     {
@@ -77,7 +76,7 @@ public:
 
         auto sizer = std::make_shared<gui::Element>();
         sizer->cursor = gui::Cursor::SizeNS;
-        sizer->back = {image,0};
+        sizer->style = gui::BACKGROUND;
         sizer->onDrag = [weak](int dx, int dy)
         {
             if(auto panel = weak.lock())
@@ -106,7 +105,7 @@ public:
 
         auto sizer = std::make_shared<gui::Element>();
         sizer->cursor = gui::Cursor::SizeWE;
-        sizer->back = {image,0};
+        sizer->style = gui::BACKGROUND;
         sizer->onDrag = [weak](int dx, int dy)
         {
             if(auto panel = weak.lock())

@@ -2,8 +2,7 @@
 
 #pragma comment(lib, "glfw3dll.lib")
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
+#include <stb_image.h>
 
 void gl::Texture::Load(const char * filename)
 {

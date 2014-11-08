@@ -1,6 +1,10 @@
 #include "window.h"
 #include "engine/gl.h"
 
+#include "nanovg.h"
+#define NANOVG_GL3_IMPLEMENTATION
+#include "nanovg_gl.h"
+
 gui::ElementPtr GetElement(const gui::ElementPtr & element, int x, int y)
 {
     for(auto it = element->children.rbegin(), end = element->children.rend(); it != end; ++it)
@@ -70,11 +74,17 @@ void Window::Insert(const char * text)
     OnEdit();
 }
 
-Window::Window(const char * title, int width, int height) : window(), /*context(),*/ width(width), height(height), focus(), isSelecting()
+Window::Window(const char * title, int width, int height) : window(), width(width), height(height), focus(), isSelecting(), vg()
 {
     window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     glfwSetWindowUserPointer(window, this);
     glfwMakeContextCurrent(window);
+
+    glewExperimental = GL_TRUE;
+	if(glewInit() != GLEW_OK) throw std::runtime_error("Could not init glew");
+
+    vg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES | NVG_DEBUG);
+	if (vg == NULL) throw std::runtime_error("Could not init nanovg");
 
     struct Color { uint8_t r,g,b,a; } W{255,255,255,255}, B{0,0,0,255}, _{0,0,0,0};
     Color arrow[] = {
@@ -329,6 +339,7 @@ Window::Window(const char * title, int width, int height) : window(), /*context(
 
 Window::~Window()
 {
+    nvgDeleteGL3(vg);
     glfwDestroyWindow(window);
 }
 
@@ -353,7 +364,7 @@ void Window::SetGuiRoot(gui::ElementPtr element)
     RefreshLayout();
 }
 
-static void DrawElement(const gui::Element & elem, const gui::Element * focus, size_t cursorIndex, size_t selectLeft, size_t selectRight)
+static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * focus, size_t cursorIndex, size_t selectLeft, size_t selectRight)
 {
     if(elem.onDraw)
     {
@@ -361,70 +372,77 @@ static void DrawElement(const gui::Element & elem, const gui::Element * focus, s
     }
     else
     {
-        if(elem.back.image)
+        if(elem.style != gui::NONE)
         {
-            const float s[] = {0, (float)elem.back.border/elem.back.image->GetWidth(), 1-(float)elem.back.border/elem.back.image->GetWidth(), 1};
-            const float t[] = {0, (float)elem.back.border/elem.back.image->GetHeight(), 1-(float)elem.back.border/elem.back.image->GetHeight(), 1};
-            const int x[] = {elem.rect.x0, elem.rect.x0+elem.back.border, elem.rect.x1-elem.back.border, elem.rect.x1};
-            const int y[] = {elem.rect.y0, elem.rect.y0+elem.back.border, elem.rect.y1-elem.back.border, elem.rect.y1};
-                
-            glEnable(GL_TEXTURE_2D);
-            elem.back.image->Bind();
-            glBegin(GL_QUADS);
-            for(int i=1; i<4; ++i)
+            NVGpaint bg;
+            switch(elem.style)
             {
-                for(int j=1; j<4; ++j)
-                {
-                    glTexCoord2f(s[j-1],t[i-1]); glVertex2f(x[j-1],y[i-1]);
-                    glTexCoord2f(s[j-0],t[i-1]); glVertex2f(x[j-0],y[i-1]);
-                    glTexCoord2f(s[j-0],t[i-0]); glVertex2f(x[j-0],y[i-0]);
-                    glTexCoord2f(s[j-1],t[i-0]); glVertex2f(x[j-1],y[i-0]);
-                }
+            case gui::BACKGROUND:
+                nvgBeginPath(vg);
+                nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+                nvgFillColor(vg, nvgRGBA(64,64,64,255));
+                nvgFill(vg);
+                break;
+            case gui::BORDER:
+                nvgBeginPath(vg);
+                nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+                nvgFillColor(vg, nvgRGBA(64,64,64,255));
+                nvgFill(vg);
+
+                nvgBeginPath(vg);
+                nvgRoundedRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight(), 6);
+                nvgRoundedRect(vg, elem.rect.x0+2, elem.rect.y0+2, elem.rect.GetWidth()-4, elem.rect.GetHeight()-4, 4);
+                nvgPathWinding(vg, NVG_HOLE);
+                nvgFillColor(vg, nvgRGBA(0,0,0,255));
+                nvgFill(vg);
+                break;
+            case gui::EDIT:
+                bg = nvgBoxGradient(vg, elem.rect.x0+1, elem.rect.y0+1+1.5f, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 3, 4, nvgRGBA(255,255,255,32), nvgRGBA(32,32,32,32));
+	            nvgBeginPath(vg);
+	            nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 3-1);
+	            nvgFillPaint(vg, bg);
+	            nvgFill(vg);
+
+	            nvgBeginPath(vg);
+	            nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 3-0.5f);
+	            nvgStrokeColor(vg, nvgRGBA(0,0,0,48));
+	            nvgStroke(vg);
+                break;
             }
-            glEnd();
-            glDisable(GL_TEXTURE_2D);
         }
 
         if(elem.text.font)
         {
             const auto & font = *elem.text.font;
 
-            if(&elem == focus)
+            if(&elem == focus && selectLeft < selectRight)
             {
-                const int x0 = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,selectLeft));
-                const int x1 = x0 + font.GetStringWidth(elem.text.text.substr(selectLeft,selectRight-selectLeft));
-                const int y0 = elem.rect.y0, y1 = y0 + font.GetLineHeight();
-                glDisable(GL_TEXTURE_2D);
-                glBegin(GL_QUADS);
-                glColor3f(0,1,1);
-                glVertex2i(x0,y0);
-                glVertex2i(x1,y0);
-                glVertex2i(x1,y1);
-                glVertex2i(x0,y1);
-                glEnd();
-            }
+                const int x = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,selectLeft));
+                const int w = font.GetStringWidth(elem.text.text.substr(selectLeft,selectRight-selectLeft));
+
+                nvgBeginPath(vg);
+                nvgRect(vg, x, elem.rect.y0, w, font.GetLineHeight());
+                nvgFillColor(vg, nvgRGBA(0,255,255,128));
+                nvgFill(vg);
+            }          
 
             font.DrawString(elem.rect.x0, elem.rect.y0, elem.text.color.r, elem.text.color.g, elem.text.color.b, elem.text.text);
 
             if(&elem == focus)
             {
-                int x0 = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,cursorIndex)), x1 = x0 + 1;
-                int y0 = elem.rect.y0, y1 = y0 + font.GetLineHeight();
-                glDisable(GL_TEXTURE_2D);
-                glBegin(GL_QUADS);
-                glColor3f(1,1,1);
-                glVertex2i(x0,y0);
-                glVertex2i(x1,y0);
-                glVertex2i(x1,y1);
-                glVertex2i(x0,y1);
-                glEnd();
+                int x = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,cursorIndex));
+
+                nvgBeginPath(vg);
+                nvgRect(vg, x, elem.rect.y0, 1, font.GetLineHeight());
+                nvgFillColor(vg, nvgRGBA(255,255,255,192));
+                nvgFill(vg);
             }
         }
     }
 
     for(const auto & child : elem.children)
     {
-        DrawElement(*child.element, focus, cursorIndex, selectLeft, selectRight);
+        DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight);
     }
 }
 
@@ -435,7 +453,8 @@ void Window::Redraw()
     glPushAttrib(GL_ALL_ATTRIB_BITS);
 
     glViewport(0, 0, width, height);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClearColor(0,0,1,0);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
@@ -445,7 +464,9 @@ void Window::Redraw()
     glPushMatrix();
     glLoadIdentity();
 
-    DrawElement(*root, focus.get(), cursor, isSelecting ? GetSelectionLeftIndex() : 0, isSelecting ? GetSelectionRightIndex() : 0);
+    nvgBeginFrame(vg, width, height, 1.0f);
+    DrawElement(vg, *root, focus.get(), cursor, isSelecting ? GetSelectionLeftIndex() : 0, isSelecting ? GetSelectionRightIndex() : 0);
+    nvgEndFrame(vg);
 
     glPopMatrix();
     glMatrixMode(GL_PROJECTION);

@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <sstream>
 
+struct NVGcontext;
+
 class Window
 {
     // Core window state
@@ -25,6 +27,9 @@ class Window
     bool isSelecting;
     int lastX, lastY;
 
+    // Rendering helpers
+    NVGcontext * vg;
+
     const char * GetFocusText() const { return focus ? focus->text.text.data() : nullptr; }
     size_t GetFocusTextSize() const { return focus ? focus->text.text.size() : 0; }   
     size_t GetSelectionLeftIndex() const { return std::min(cursor, mark); }
@@ -40,6 +45,8 @@ class Window
 public:
     Window(const char * title, int width, int height);
     ~Window();
+
+    NVGcontext * GetNanoVG() const { return vg; }
 
     bool ShouldClose() const { return !!glfwWindowShouldClose(window); }
 

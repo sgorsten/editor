@@ -27,11 +27,15 @@
     <ClInclude Include="..\..\src\engine\utf8.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\dep\src\nanovg.c" />
     <ClCompile Include="..\..\src\engine\font.cpp" />
     <ClCompile Include="..\..\src\engine\geometry.cpp" />
     <ClCompile Include="..\..\src\engine\gl.cpp" />
     <ClCompile Include="..\..\src\engine\transform.cpp" />
     <ClCompile Include="..\..\src\engine\utf8.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6B85FF49-F8B2-4703-8CFD-563500856CB8}</ProjectGuid>
@@ -163,5 +167,7 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\rxd_glew.redist.1.10.0.1\build\native\rxd_glew.redist.targets" Condition="Exists('..\packages\rxd_glew.redist.1.10.0.1\build\native\rxd_glew.redist.targets')" />
+    <Import Project="..\packages\rxd_glew.1.10.0.1\build\native\rxd_glew.targets" Condition="Exists('..\packages\rxd_glew.1.10.0.1\build\native\rxd_glew.targets')" />
   </ImportGroup>
 </Project>

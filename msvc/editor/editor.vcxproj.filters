@@ -10,4 +10,7 @@
     <ClInclude Include="..\..\src\editor\window.h" />
     <ClInclude Include="..\..\src\editor\widgets.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
 </Project>

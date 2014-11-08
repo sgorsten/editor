@@ -172,7 +172,7 @@ class Editor
     Scene               scene;
     View                view;
 public:
-    Editor() : window("Editor", 1280, 720), font("C:/windows/fonts/arialbd.ttf", 16, true, 0x500), factory(font, 2, {&edit,1}), view(scene)
+    Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "C:/windows/fonts/arialbd.ttf", 16, true, 0x500), factory(font, 2), view(scene)
     {
         mesh = {
             {{-0.1f,-0.1f,0}, {+0.1f,-0.1f,0}, {+0.1f,+0.1f,0}, {-0.1f,+0.1f,0}},
@@ -194,8 +194,8 @@ public:
         }
 
         propertyPanel = std::make_shared<gui::Element>();
-        auto topRightPanel = factory.AddBorder(4, &border, objectList.GetPanel());
-        auto bottomRightPanel = factory.AddBorder(4, &border, propertyPanel);
+        auto topRightPanel = factory.AddBorder(4, gui::BORDER, objectList.GetPanel());
+        auto bottomRightPanel = factory.AddBorder(4, gui::BORDER, propertyPanel);
         auto rightPanel = factory.MakeNSSizer(&sizer, topRightPanel, bottomRightPanel, 200);
         guiRoot = factory.MakeWESizer(&sizer, view.CreateViewport(factory), rightPanel, -400);
     

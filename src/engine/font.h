@@ -7,27 +7,23 @@
 #include <string>
 #include <map>
 
+struct NVGcontext;
+
 class Font
 {
-    struct Glyph
-    {
-        float s0,t0,s1,t1;
-        int x0,y0,x1,y1,advance;
-        std::map<uint32_t,int> kerning;
-    };
-    std::map<uint32_t,Glyph> glyphs;
-    int height, baseline, texWidth, texHeight;
-    GLuint texture;
+    NVGcontext * vg;
+    std::string name;
+    int pixelHeight;
+    bool dropShadow;
 public:
-    Font(const char * filename, int pixelHeight, bool dropShadow = false, uint32_t maxCodepoint = 127);
+    Font(NVGcontext * vg, const char * filename, int pixelHeight, bool dropShadow = false, uint32_t maxCodepoint = 127);
 
-    int GetLineHeight() const { return height; }        // Number of pixels from top to bottom of a line
-    int GetBaselineOffset() const { return baseline; }  // Number of pixels from top of a line to the "baseline" of the font
+    int GetLineHeight() const; // Number of pixels from top to bottom of a line
+    int GetBaselineOffset() const; // Number of pixels from top of a line to the "baseline" of the font
     int GetStringWidth(const std::string & s) const;
     size_t GetUnitIndex(const std::string & s, int x) const;
 
     void DrawString(int x, int y, float r, float g, float b, const std::string & s) const;
-    void DrawFontTexture(int x, int y) const;
 };
 
 #endif

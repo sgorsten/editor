@@ -41,14 +41,9 @@ namespace gui
 
     struct Child;
 
+    enum Style { NONE, BACKGROUND, BORDER, EDIT };
     struct Element
     {
-        struct BackgroundComponent
-        {
-            const gl::Texture * image;
-            int border;
-        };
-
         struct TextComponent
         {
             Color color;
@@ -58,7 +53,7 @@ namespace gui
         };
 
         Cursor                                              cursor;
-        BackgroundComponent                                 back;
+        Style                                               style;
         TextComponent                                       text;
         Rect                                                rect;
         std::vector<Child>                                  children;
