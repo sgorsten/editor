@@ -25,18 +25,37 @@ struct Mesh
     std::vector<Vertex> vertices;
     std::vector<uint3> triangles;
 
+    gl::Buffer vb,ib;
+
+    Mesh() {}
+    Mesh(Mesh && m) : Mesh() { *this = std::move(m); }
+    Mesh & operator = (Mesh && m) { vertices=move(m.vertices); triangles=move(m.triangles); vb=std::move(m.vb); ib=std::move(m.ib); return *this; }
+
     RayMeshHit Hit(const Ray & ray) const { return IntersectRayMesh(ray, vertices.data(), &Vertex::position, triangles.data(), triangles.size()); }
 
-    void Draw() const
+    void Upload()
     {
-        glBegin(GL_TRIANGLES);
-        for(auto & tri : triangles)
-        {
-            vertices[tri.x].Draw();
-            vertices[tri.y].Draw();
-            vertices[tri.z].Draw();
-        }
-        glEnd();
+        vb.Bind(GL_ARRAY_BUFFER);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)*vertices.size(), vertices.data(), GL_STATIC_DRAW);
+
+        ib.Bind(GL_ELEMENT_ARRAY_BUFFER);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint3)*triangles.size(), triangles.data(), GL_STATIC_DRAW);
+    }
+
+    void Draw()
+    {
+        const Vertex * null = 0;
+        vb.Bind(GL_ARRAY_BUFFER);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), &null->position);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), &null->normal);
+
+        ib.Bind(GL_ELEMENT_ARRAY_BUFFER);
+        glDrawElements(GL_TRIANGLES, triangles.size()*3, GL_UNSIGNED_INT, nullptr);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 };
 
@@ -45,20 +64,21 @@ struct Object
     std::string name;
     float3 position;
     float3 color;
-    const Mesh * mesh;
+    Mesh * mesh;
+    GLuint prog;
 
     RayMeshHit Hit(const Ray & ray) const
     {
         return mesh->Hit({ray.start-position,ray.direction});
     }
 
-    void Draw() const
+    void Draw(const float4x4 & viewProj)
     {
-        glPushMatrix();
-        glMult(TranslationMatrix(position));
-        glColor(color);
+        auto mvp = mul(viewProj, TranslationMatrix(position));
+        glUseProgram(prog);
+        glUniformMatrix4fv(glGetUniformLocation(prog, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+        glUniform3fv(glGetUniformLocation(prog, "u_color"), 1, &color.x);
         mesh->Draw();
-        glPopMatrix();
     }
 };
 
@@ -82,9 +102,9 @@ struct Scene
         return best;
     }
 
-    void Draw() const
+    void Draw(const float4x4 & viewProj)
     {
-        for(auto & obj : objects) obj.Draw();
+        for(auto & obj : objects) obj.Draw(viewProj);
     }
 };
 
@@ -153,25 +173,11 @@ struct View
         glClearColor(0,0,1,1);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoad(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f));
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoad(viewpoint.Inverse().Matrix());
-
-        float pos[] = {0.2f,1,0.3f,0}, ambient[] = {0.5f,0.5f,0.5f,1.0f};
-        glEnable(GL_LIGHTING);
-        glEnable(GL_LIGHT0);
-        glLightfv(GL_LIGHT0, GL_POSITION, pos);
-        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient);
-        glEnable(GL_COLOR_MATERIAL);
-
         glEnable(GL_DEPTH_TEST);
+        auto viewProj = mul(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f), viewpoint.Inverse().Matrix());
+        scene.Draw(viewProj);
 
-        scene.Draw();
-
-        if(selection.object)
+        /*if(selection.object)
         {
             glPushMatrix();
             glMult(TranslationMatrix(selection.object->position));
@@ -183,11 +189,8 @@ struct View
             glColor3f(1,1,1);
             selection.object->mesh->Draw();
             glPopMatrix();
-        }
+        }*/
         
-        glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
         glPopAttrib();
     }
 
@@ -216,16 +219,18 @@ struct View
 
 Mesh MakeBox(const float3 & halfDims)
 {
-    Mesh mesh = {
-        {{{+1,-1,-1},{+1,0,0}}, {{+1,+1,-1},{+1,0,0}}, {{+1,+1,+1},{+1,0,0}}, {{+1,-1,+1},{+1,0,0}},
-         {{-1,+1,-1},{-1,0,0}}, {{-1,-1,-1},{-1,0,0}}, {{-1,-1,+1},{-1,0,0}}, {{-1,+1,+1},{-1,0,0}},
-         {{-1,+1,-1},{0,+1,0}}, {{-1,+1,+1},{0,+1,0}}, {{+1,+1,+1},{0,+1,0}}, {{+1,+1,-1},{0,+1,0}},
-         {{-1,-1,+1},{0,-1,0}}, {{-1,-1,-1},{0,-1,0}}, {{+1,-1,-1},{0,-1,0}}, {{+1,-1,+1},{0,-1,0}},
-         {{-1,-1,+1},{0,0,+1}}, {{+1,-1,+1},{0,0,+1}}, {{+1,+1,+1},{0,0,+1}}, {{-1,+1,+1},{0,0,+1}},
-         {{+1,-1,-1},{0,0,-1}}, {{-1,-1,-1},{0,0,-1}}, {{-1,+1,-1},{0,0,-1}}, {{+1,+1,-1},{0,0,-1}}},
-        {{{0,1,2}, {0,2,3}, {4,5,6}, {4,6,7}, {8,9,10}, {8,10,11}, {12,13,14}, {12,14,15}, {16,17,18}, {16,18,19}, {20,21,22}, {20,22,23}}}
+    Mesh mesh;
+    mesh.vertices = {
+        {{+1,-1,-1},{+1,0,0}}, {{+1,+1,-1},{+1,0,0}}, {{+1,+1,+1},{+1,0,0}}, {{+1,-1,+1},{+1,0,0}},
+        {{-1,+1,-1},{-1,0,0}}, {{-1,-1,-1},{-1,0,0}}, {{-1,-1,+1},{-1,0,0}}, {{-1,+1,+1},{-1,0,0}},
+        {{-1,+1,-1},{0,+1,0}}, {{-1,+1,+1},{0,+1,0}}, {{+1,+1,+1},{0,+1,0}}, {{+1,+1,-1},{0,+1,0}},
+        {{-1,-1,+1},{0,-1,0}}, {{-1,-1,-1},{0,-1,0}}, {{+1,-1,-1},{0,-1,0}}, {{+1,-1,+1},{0,-1,0}},
+        {{-1,-1,+1},{0,0,+1}}, {{+1,-1,+1},{0,0,+1}}, {{+1,+1,+1},{0,0,+1}}, {{-1,+1,+1},{0,0,+1}},
+        {{+1,-1,-1},{0,0,-1}}, {{-1,-1,-1},{0,0,-1}}, {{-1,+1,-1},{0,0,-1}}, {{+1,+1,-1},{0,0,-1}}
     };
+    mesh.triangles = {{0,1,2}, {0,2,3}, {4,5,6}, {4,6,7}, {8,9,10}, {8,10,11}, {12,13,14}, {12,14,15}, {16,17,18}, {16,18,19}, {20,21,22}, {20,22,23}};
     for(auto & vert : mesh.vertices) vert.position *= halfDims;
+    mesh.Upload();
     return mesh;
 }
 
@@ -245,13 +250,69 @@ class Editor
 public:
     Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), view(scene, selection)
     {
+        const char * vsSource[] = {R"(#version 330
+uniform mat4 u_modelViewProj;
+layout(location = 0) in vec3 v_position;
+layout(location = 1) in vec3 v_normal;
+out vec3 normal;
+void main()
+{
+    gl_Position = u_modelViewProj * vec4(v_position,1);
+    normal = v_normal;
+}
+)"};
+
+        GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(vs, 1, vsSource, nullptr);
+        glCompileShader(vs);
+
+        GLint status, length;
+        glGetShaderiv(vs, GL_COMPILE_STATUS, &status);
+        if(status == GL_FALSE)
+        {
+            glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &length);
+            std::vector<char> buffer(length);
+            glGetShaderInfoLog(vs, length, nullptr, buffer.data());
+            throw std::runtime_error(buffer.data());
+        }
+
+        const char * fsSource[] = {R"(#version 330
+uniform vec3 u_color;
+in vec3 normal;
+void main()
+{
+    gl_FragColor = vec4(u_color,1);
+}
+)"};
+
+        GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(fs, 1, fsSource, nullptr);
+        glCompileShader(fs);
+
+        glGetShaderiv(fs, GL_COMPILE_STATUS, &status);
+        if(status == GL_FALSE)
+        {
+            glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &length);
+            std::vector<char> buffer(length);
+            glGetShaderInfoLog(vs, length, nullptr, buffer.data());
+            throw std::runtime_error(buffer.data());
+        }
+
+        GLuint prog = glCreateProgram();
+        glAttachShader(prog, vs);
+        glAttachShader(prog, fs);
+        glLinkProgram(prog);
+
+        glGetProgramiv(prog, GL_LINK_STATUS, &status);
+        if(status == GL_FALSE) throw std::runtime_error("Link error.");
+
         mesh = MakeBox({0.5f,0.5f,0.5f});
         ground = MakeBox({4,0.1f,4});
         scene.objects = {
-            {"Ground",{0,-0.1f,0},{0.4f,0.4f,0.4f},&ground},
-            {"Alpha",{-0.6f,0.5f,0},{1,0,0},&mesh},
-            {"Beta", {+0.6f,0.5f,0},{0,1,0},&mesh},
-            {"Gamma",{ 0.0f,1.5f,0},{1,1,0},&mesh}
+            {"Ground",{0,-0.1f,0},{0.4f,0.4f,0.4f},&ground,prog},
+            {"Alpha",{-0.6f,0.5f,0},{1,0,0},&mesh,prog},
+            {"Beta", {+0.6f,0.5f,0},{0,1,0},&mesh,prog},
+            {"Gamma",{ 0.0f,1.5f,0},{1,1,0},&mesh,prog}
         };
         view.viewpoint.position = {0,1,4};
 

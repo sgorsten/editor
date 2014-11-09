@@ -5,9 +5,30 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <string>
+#include <vector>
 
 namespace gl
 {
+    class Buffer
+    {
+        GLuint buffer;
+    public:
+        Buffer() : buffer() {}
+        Buffer(Buffer && b) : buffer(b.buffer) { b.buffer = 0; }
+        Buffer(const Buffer &) = delete;
+        ~Buffer() { if(buffer) glDeleteBuffers(1,&buffer); }
+
+        Buffer & operator = (Buffer && b) { std::swap(buffer, b.buffer); return *this; }
+        Buffer & operator = (const Buffer &) = delete;        
+
+        void Bind(GLenum target)
+        {
+            if(!buffer) glGenBuffers(1,&buffer);
+            glBindBuffer(target, buffer);
+        }
+    };
+
     class Texture
     {
         GLuint tex;
