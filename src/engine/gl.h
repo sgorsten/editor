@@ -43,6 +43,9 @@ namespace gl
 
         void Load(const char * filename);
     };
+
+    GLuint CompileShader(GLenum type, const char * source);
+    GLuint LinkProgram(GLuint vertShader, GLuint fragShader);
 }
 
 inline void glVertex(const float2 & vertex) { glVertex2fv(&vertex.x); }

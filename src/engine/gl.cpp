@@ -22,3 +22,46 @@ void gl::Texture::Load(const char * filename)
         height = y;
     }
 }
+
+GLuint gl::CompileShader(GLenum type, const char * source)
+{
+    const char * sources[] = {source};
+
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, sources, nullptr);
+    glCompileShader(shader);
+
+    GLint status, length;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+    if(status == GL_FALSE)
+    {
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
+        std::vector<char> buffer(length);
+        glGetShaderInfoLog(shader, length, nullptr, buffer.data());
+        glDeleteShader(shader);
+        throw std::runtime_error(std::string("glCompileShader(...) failed with log:\n") + buffer.data());
+    }
+
+    return shader;
+}
+
+GLuint gl::LinkProgram(GLuint vertShader, GLuint fragShader)
+{
+    GLuint program = glCreateProgram();
+    glAttachShader(program, vertShader);
+    glAttachShader(program, fragShader);
+    glLinkProgram(program);
+
+    GLint status, length;
+    glGetProgramiv(program, GL_LINK_STATUS, &status);
+    if(status == GL_FALSE)
+    {
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+        std::vector<char> buffer(length);
+        glGetProgramInfoLog(program, length, nullptr, buffer.data());
+        glDeleteProgram(program);
+        throw std::runtime_error(std::string("glLinkProgram(...) failed with log:\n") + buffer.data());
+    }
+
+    return program;
+}

@@ -116,8 +116,9 @@ struct Scene
 struct Selection
 {
     Object * object;
+    GLuint selectionProgram;
 
-    Selection() : object() {}
+    Selection() : object(), selectionProgram() {}
 
     void SetSelection(Object * object)
     {
@@ -188,10 +189,10 @@ struct View
             glDepthFunc(GL_LEQUAL);
             glEnable(GL_POLYGON_OFFSET_LINE);
             glPolygonOffset(-1, -1);
-            auto col = selection.object->color;
-            selection.object->color = {1,1,1};
-            selection.object->Draw(viewProj, viewpoint.position, scene.objects.back().position);
-            selection.object->color = col;
+            auto prog = selection.object->prog;
+            selection.object->prog = selection.selectionProgram;
+            selection.object->Draw(viewProj, viewpoint.position, {});
+            selection.object->prog = prog;
         }
         
         glPopAttrib();
@@ -253,7 +254,7 @@ class Editor
 public:
     Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), view(scene, selection)
     {
-        const char * vsSource[] = {R"(#version 330
+        auto vs = gl::CompileShader(GL_VERTEX_SHADER, R"(#version 330
 uniform mat4 u_model;
 uniform mat4 u_modelViewProj;
 layout(location = 0) in vec3 v_position;
@@ -266,23 +267,9 @@ void main()
     position = (u_model * vec4(v_position,1)).xyz;
     normal = (u_model * vec4(v_normal,0)).xyz;
 }
-)"};
+)");
 
-        GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vs, 1, vsSource, nullptr);
-        glCompileShader(vs);
-
-        GLint status, length;
-        glGetShaderiv(vs, GL_COMPILE_STATUS, &status);
-        if(status == GL_FALSE)
-        {
-            glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &length);
-            std::vector<char> buffer(length);
-            glGetShaderInfoLog(vs, length, nullptr, buffer.data());
-            throw std::runtime_error(buffer.data());
-        }
-
-        const char * fsSource[] = {R"(#version 330
+        auto fs = gl::CompileShader(GL_FRAGMENT_SHADER, R"(#version 330
 uniform vec3 u_lightPos;
 uniform vec3 u_eye;
 uniform vec3 u_color;
@@ -299,28 +286,12 @@ void main()
     light += pow(max(dot(normal, halfDir), 0), 64);
     gl_FragColor = vec4(u_color*light,1);
 }
-)"};
+)");
 
-        GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fs, 1, fsSource, nullptr);
-        glCompileShader(fs);
+        auto fs2 = gl::CompileShader(GL_FRAGMENT_SHADER, "#version 330\nvoid main() { gl_FragColor = vec4(1,1,1,1); }");
 
-        glGetShaderiv(fs, GL_COMPILE_STATUS, &status);
-        if(status == GL_FALSE)
-        {
-            glGetShaderiv(fs, GL_INFO_LOG_LENGTH, &length);
-            std::vector<char> buffer(length);
-            glGetShaderInfoLog(fs, length, nullptr, buffer.data());
-            throw std::runtime_error(buffer.data());
-        }
-
-        GLuint prog = glCreateProgram();
-        glAttachShader(prog, vs);
-        glAttachShader(prog, fs);
-        glLinkProgram(prog);
-
-        glGetProgramiv(prog, GL_LINK_STATUS, &status);
-        if(status == GL_FALSE) throw std::runtime_error("Link error.");
+        auto prog = gl::LinkProgram(vs, fs);
+        selection.selectionProgram = gl::LinkProgram(vs, fs2);
 
         mesh = MakeBox({0.5f,0.5f,0.5f});
         ground = MakeBox({4,0.1f,4});
