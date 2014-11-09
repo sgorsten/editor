@@ -72,12 +72,16 @@ struct Object
         return mesh->Hit({ray.start-position,ray.direction});
     }
 
-    void Draw(const float4x4 & viewProj)
+    void Draw(const float4x4 & viewProj, const float3 & eye, const float3 & lightPos)
     {
-        auto mvp = mul(viewProj, TranslationMatrix(position));
+        auto model = TranslationMatrix(position);
+        auto mvp = mul(viewProj, model);
         glUseProgram(prog);
+        glUniformMatrix4fv(glGetUniformLocation(prog, "u_model"), 1, GL_FALSE, &model.x.x);
         glUniformMatrix4fv(glGetUniformLocation(prog, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+        glUniform3fv(glGetUniformLocation(prog, "u_eye"), 1, &eye.x);
         glUniform3fv(glGetUniformLocation(prog, "u_color"), 1, &color.x);
+        glUniform3fv(glGetUniformLocation(prog, "u_lightPos"), 1, &lightPos.x);
         mesh->Draw();
     }
 };
@@ -102,9 +106,10 @@ struct Scene
         return best;
     }
 
-    void Draw(const float4x4 & viewProj)
+    void Draw(const float4x4 & viewProj, const float3 & eye)
     {
-        for(auto & obj : objects) obj.Draw(viewProj);
+        auto lightPos = objects.back().position;
+        for(auto & obj : objects) obj.Draw(viewProj, eye, lightPos);
     }
 };
 
@@ -175,21 +180,19 @@ struct View
 
         glEnable(GL_DEPTH_TEST);
         auto viewProj = mul(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f), viewpoint.Inverse().Matrix());
-        scene.Draw(viewProj);
+        scene.Draw(viewProj, viewpoint.position);
 
-        /*if(selection.object)
+        if(selection.object)
         {
-            glPushMatrix();
-            glMult(TranslationMatrix(selection.object->position));
-            glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glDepthFunc(GL_LEQUAL);
             glEnable(GL_POLYGON_OFFSET_LINE);
             glPolygonOffset(-1, -1);
-            glDisable(GL_LIGHTING);
-            glColor3f(1,1,1);
-            selection.object->mesh->Draw();
-            glPopMatrix();
-        }*/
+            auto col = selection.object->color;
+            selection.object->color = {1,1,1};
+            selection.object->Draw(viewProj, viewpoint.position, scene.objects.back().position);
+            selection.object->color = col;
+        }
         
         glPopAttrib();
     }
@@ -242,7 +245,7 @@ class Editor
     ListControl         objectList;
     gui::ElementPtr     propertyPanel;
     gui::ElementPtr     guiRoot;
-    Mesh                mesh,ground;
+    Mesh                mesh,ground,bulb;
 
     Scene               scene;
     Selection           selection;
@@ -251,14 +254,17 @@ public:
     Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), view(scene, selection)
     {
         const char * vsSource[] = {R"(#version 330
+uniform mat4 u_model;
 uniform mat4 u_modelViewProj;
 layout(location = 0) in vec3 v_position;
 layout(location = 1) in vec3 v_normal;
+out vec3 position;
 out vec3 normal;
 void main()
 {
     gl_Position = u_modelViewProj * vec4(v_position,1);
-    normal = v_normal;
+    position = (u_model * vec4(v_position,1)).xyz;
+    normal = (u_model * vec4(v_normal,0)).xyz;
 }
 )"};
 
@@ -277,11 +283,21 @@ void main()
         }
 
         const char * fsSource[] = {R"(#version 330
+uniform vec3 u_lightPos;
+uniform vec3 u_eye;
 uniform vec3 u_color;
+in vec3 position;
 in vec3 normal;
 void main()
 {
-    gl_FragColor = vec4(u_color,1);
+    vec3 lightDir = normalize(u_lightPos - position);
+    vec3 eyeDir = normalize(u_eye - position);
+    vec3 halfDir = normalize(lightDir + eyeDir);
+
+    float light = 0.3;
+    light += max(dot(normal, lightDir), 0);
+    light += pow(max(dot(normal, halfDir), 0), 64);
+    gl_FragColor = vec4(u_color*light,1);
 }
 )"};
 
@@ -292,9 +308,9 @@ void main()
         glGetShaderiv(fs, GL_COMPILE_STATUS, &status);
         if(status == GL_FALSE)
         {
-            glGetShaderiv(vs, GL_INFO_LOG_LENGTH, &length);
+            glGetShaderiv(fs, GL_INFO_LOG_LENGTH, &length);
             std::vector<char> buffer(length);
-            glGetShaderInfoLog(vs, length, nullptr, buffer.data());
+            glGetShaderInfoLog(fs, length, nullptr, buffer.data());
             throw std::runtime_error(buffer.data());
         }
 
@@ -308,11 +324,13 @@ void main()
 
         mesh = MakeBox({0.5f,0.5f,0.5f});
         ground = MakeBox({4,0.1f,4});
+        bulb = MakeBox({0.1f,0.1f,0.1f});
         scene.objects = {
             {"Ground",{0,-0.1f,0},{0.4f,0.4f,0.4f},&ground,prog},
             {"Alpha",{-0.6f,0.5f,0},{1,0,0},&mesh,prog},
             {"Beta", {+0.6f,0.5f,0},{0,1,0},&mesh,prog},
-            {"Gamma",{ 0.0f,1.5f,0},{1,1,0},&mesh,prog}
+            {"Gamma",{ 0.0f,1.5f,0},{1,1,0},&mesh,prog},
+            {"Light",{ 0.0f,3.0f,1.0},{1,1,1},&bulb,prog},
         };
         view.viewpoint.position = {0,1,4};
 
