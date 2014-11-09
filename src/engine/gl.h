@@ -10,23 +10,33 @@
 
 namespace gl
 {
-    class Buffer
+    inline GLenum GetType(uint8_t *) { return GL_UNSIGNED_BYTE; }
+    inline GLenum GetType(uint16_t *) { return GL_UNSIGNED_SHORT; }
+    inline GLenum GetType(uint32_t *) { return GL_UNSIGNED_INT; }
+    inline GLenum GetType(float *) { return GL_FLOAT; }
+
+    class Mesh
     {
-        GLuint buffer;
+        GLuint vertexArray,arrayBuffer,elementBuffer;
+        GLsizei vertexCount,indexCount;
+        GLenum mode,indexType;
     public:
-        Buffer() : buffer() {}
-        Buffer(Buffer && b) : buffer(b.buffer) { b.buffer = 0; }
-        Buffer(const Buffer &) = delete;
-        ~Buffer() { if(buffer) glDeleteBuffers(1,&buffer); }
+        Mesh();
+        Mesh(Mesh && r);
+        Mesh(const Mesh & r) = delete;
+        Mesh & operator = (Mesh && r);
+        Mesh & operator = (const Mesh & r) = delete;
+        ~Mesh();
 
-        Buffer & operator = (Buffer && b) { std::swap(buffer, b.buffer); return *this; }
-        Buffer & operator = (const Buffer &) = delete;        
+        void Draw() const;
 
-        void Bind(GLenum target)
-        {
-            if(!buffer) glGenBuffers(1,&buffer);
-            glBindBuffer(target, buffer);
-        }
+        void SetVertexData(const void * vertices, size_t vertexSize, size_t vertexCount);
+        void SetAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid * pointer);
+        void SetIndexData(const void * indices, GLenum type, size_t indexCount, GLenum mode);
+
+        template<class V> void SetVertices(const std::vector<V> & vertices) { SetVertexData(vertices.data(), sizeof(V), vertices.size()); }
+        template<class V, class T, int N> void SetAttribute(GLuint index, vec<T,N> V::*attribute, bool normalized = false) { SetAttribPointer(index, N, GetType((T*)0), normalized ? GL_TRUE : GL_FALSE, sizeof(V), &(reinterpret_cast<V *>(nullptr)->*attribute)); }
+        template<class T, int N> void SetElements(const std::vector<vec<T,N>> & elements) { const GLenum modes[] = {0,GL_POINTS,GL_LINES,GL_TRIANGLES,GL_QUADS}; SetIndexData(elements.data(), GetType((T*)0), elements.size()*N, modes[N]); }
     };
 
     class Texture
@@ -47,14 +57,5 @@ namespace gl
     GLuint CompileShader(GLenum type, const char * source);
     GLuint LinkProgram(GLuint vertShader, GLuint fragShader);
 }
-
-inline void glVertex(const float2 & vertex) { glVertex2fv(&vertex.x); }
-inline void glVertex(const float3 & vertex) { glVertex3fv(&vertex.x); }
-inline void glVertex(const float4 & vertex) { glVertex4fv(&vertex.x); }
-inline void glNormal(const float3 & normal) { glNormal3fv(&normal.x); }
-inline void glColor(const float3 & color) { glColor3fv(&color.x); }
-inline void glColor(const float4 & color) { glColor4fv(&color.x); }
-inline void glLoad(const float4x4 & matrix) { glLoadMatrixf(&matrix.x.x); }
-inline void glMult(const float4x4 & matrix) { glMultMatrixf(&matrix.x.x); }
 
 #endif

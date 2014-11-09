@@ -13,49 +13,31 @@
 struct Vertex
 {
     float3 position, normal;
-    void Draw() const
-    {
-        glNormal(normal);
-        glVertex(position);
-    }
 };
 
 struct Mesh
 {
     std::vector<Vertex> vertices;
     std::vector<uint3> triangles;
-
-    gl::Buffer vb,ib;
+    gl::Mesh glMesh;
 
     Mesh() {}
     Mesh(Mesh && m) : Mesh() { *this = std::move(m); }
-    Mesh & operator = (Mesh && m) { vertices=move(m.vertices); triangles=move(m.triangles); vb=std::move(m.vb); ib=std::move(m.ib); return *this; }
+    Mesh & operator = (Mesh && m) { vertices=move(m.vertices); triangles=move(m.triangles); glMesh=std::move(m.glMesh); return *this; }
 
     RayMeshHit Hit(const Ray & ray) const { return IntersectRayMesh(ray, vertices.data(), &Vertex::position, triangles.data(), triangles.size()); }
 
     void Upload()
-    {
-        vb.Bind(GL_ARRAY_BUFFER);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)*vertices.size(), vertices.data(), GL_STATIC_DRAW);
-
-        ib.Bind(GL_ELEMENT_ARRAY_BUFFER);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint3)*triangles.size(), triangles.data(), GL_STATIC_DRAW);
+    {       
+        glMesh.SetVertices(vertices);
+        glMesh.SetAttribute(0, &Vertex::position);
+        glMesh.SetAttribute(1, &Vertex::normal);
+        glMesh.SetElements(triangles);
     }
 
     void Draw()
     {
-        const Vertex * null = 0;
-        vb.Bind(GL_ARRAY_BUFFER);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), &null->position);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), &null->normal);
-
-        ib.Bind(GL_ELEMENT_ARRAY_BUFFER);
-        glDrawElements(GL_TRIANGLES, triangles.size()*3, GL_UNSIGNED_INT, nullptr);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        glMesh.Draw();
     }
 };
 
@@ -283,7 +265,7 @@ void main()
 
     float light = 0.3;
     light += max(dot(normal, lightDir), 0);
-    light += pow(max(dot(normal, halfDir), 0), 64);
+    light += pow(max(dot(normal, halfDir), 0), 128);
     gl_FragColor = vec4(u_color*light,1);
 }
 )");

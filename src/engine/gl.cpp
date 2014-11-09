@@ -1,10 +1,66 @@
 #include "gl.h"
-
+#include <stb_image.h>
 #pragma comment(lib, "glfw3dll.lib")
 
-#include <stb_image.h>
+template<class T> T & BltSwap(T * lhs, T & rhs)
+{
+    char temp[sizeof(T)];
+    memcpy(temp, lhs, sizeof(T));
+    memcpy(lhs, &rhs, sizeof(T));
+    memcpy(&rhs, temp, sizeof(T));
+    return *lhs;
+}
 
-void gl::Texture::Load(const char * filename)
+using namespace gl;
+
+Mesh::Mesh() : vertexArray(), arrayBuffer(), elementBuffer(), vertexCount(), indexCount(), mode(GL_TRIANGLES), indexType() {}
+Mesh::Mesh(Mesh && r) : Mesh() { BltSwap(this,r); }
+Mesh & Mesh::operator = (Mesh && r) { return BltSwap(this,r); }
+Mesh::~Mesh()
+{
+    if(elementBuffer) glDeleteBuffers(1,&elementBuffer);
+    if(arrayBuffer) glDeleteBuffers(1,&arrayBuffer);
+    if(vertexArray) glDeleteVertexArrays(1,&vertexArray);
+}
+
+void Mesh::Draw() const
+{
+    glBindVertexArray(vertexArray);
+    if(elementBuffer) glDrawElements(mode, indexCount, indexType, nullptr);
+    else glDrawArrays(mode, 0, vertexCount);
+}
+
+void Mesh::SetVertexData(const void * vertices, size_t vertexSize, size_t vertexCount)
+{
+    if(!arrayBuffer) glGenBuffers(1,&arrayBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
+    glBufferData(GL_ARRAY_BUFFER, vertexSize*vertexCount, vertices, GL_STATIC_DRAW);
+    this->vertexCount = vertexCount;
+}
+
+void Mesh::SetAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid * pointer)
+{
+    if(!vertexArray) glGenVertexArrays(1, &vertexArray);
+    glBindVertexArray(vertexArray);
+    if(!arrayBuffer) glGenBuffers(1,&arrayBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
+    glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+    glEnableVertexAttribArray(index);
+}
+
+void Mesh::SetIndexData(const void * indices, GLenum type, size_t indexCount, GLenum mode)
+{
+    if(!vertexArray) glGenVertexArrays(1, &vertexArray);
+    glBindVertexArray(vertexArray);
+    if(!elementBuffer) glGenBuffers(1,&elementBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, (type == GL_UNSIGNED_INT ? 4 : type == GL_UNSIGNED_SHORT ? 2 : type == GL_UNSIGNED_BYTE ? 1 : 0)*indexCount, indices, GL_STATIC_DRAW);
+    this->indexCount = indexCount;
+    this->indexType = type;
+    this->mode = mode;
+}
+
+void Texture::Load(const char * filename)
 {
     int x, y, n;
     if(auto pixels = stbi_load(filename, &x, &y, &n, 0))
