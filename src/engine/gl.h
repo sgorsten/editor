@@ -17,9 +17,9 @@ namespace gl
 
     class Mesh
     {
-        GLuint vertexArray,arrayBuffer,elementBuffer;
-        GLsizei vertexCount,indexCount;
-        GLenum mode,indexType;
+        GLuint vertexArray, arrayBuffer, elementBuffer;
+        GLsizei vertexCount, indexCount;
+        GLenum mode, indexType;
     public:
         Mesh();
         Mesh(Mesh && r);

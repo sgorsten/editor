@@ -128,6 +128,18 @@ public:
     }
 };
 
+class ListControl;
+
+class ListItem : public gui::Element
+{
+    ListControl & list;
+    int index;
+public:
+    ListItem(ListControl & list, int index) : list(list), index(index) {}
+
+    gui::DraggerPtr OnClick(int x, int y);
+};
+
 class ListControl
 {
     gui::ElementPtr panel;
@@ -156,14 +168,17 @@ public:
     {
         auto label = factory.MakeLabel(text);
 
+        auto item = std::make_shared<ListItem>(*this, panel->children.size());
+        item->text = label->text;
+
         float y0 = panel->children.empty() ? 0 : panel->children.back().placement.y1.b+2;
-        float y1 = y0 + label->text.font->GetLineHeight();
-        int index = panel->children.size();
-        panel->children.push_back({{{0,0},{0,y0},{1,0},{0,y1}},label});
-        label->onClick = [this,index](int, int) { SetSelectedIndex(index); };
+        float y1 = y0 + item->text.font->GetLineHeight();
+        panel->children.push_back({{{0,0},{0,y0},{1,0},{0,y1}},item});
     }
 
     std::function<void()> onSelectionChanged;
 };
+
+gui::DraggerPtr ListItem::OnClick(int x, int y) { list.SetSelectedIndex(index); return {}; };
 
 #endif

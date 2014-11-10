@@ -1,6 +1,8 @@
 #ifndef EDITOR_GUI_H
 #define EDITOR_GUI_H
 
+#include "engine/linalg.h"
+
 #include <string>
 #include <vector>
 #include <memory>
@@ -12,6 +14,14 @@ namespace gl { class Texture; }
 
 namespace gui
 {
+    struct IDragger
+    {
+        virtual void OnDrag(int2 newMouse) = 0;
+        virtual void OnRelease() = 0;
+        virtual void OnCancel() = 0;
+    };
+    typedef std::shared_ptr<IDragger> DraggerPtr;
+
     enum class Cursor { Arrow, IBeam, SizeNS, SizeWE };
 
     struct Color
@@ -58,7 +68,8 @@ namespace gui
         Rect                                                rect;
         std::vector<Child>                                  children;
 
-        std::function<void(int x, int y)>                   onClick;
+        virtual DraggerPtr                                  OnClick(int x, int y) { return nullptr; }
+
         std::function<void(int dx, int dy)>                 onDrag;
         std::function<void(const std::string & text)>       onEdit;
         std::function<void(const Rect & rect)>              onDraw;        

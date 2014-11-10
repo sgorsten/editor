@@ -23,6 +23,7 @@ class Window
     
     // Text manipulation logic
     gui::ElementPtr focus;
+    gui::DraggerPtr dragger;
     size_t cursor, mark;
     bool isSelecting;
     int lastX, lastY;

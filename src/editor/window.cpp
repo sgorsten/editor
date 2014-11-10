@@ -25,13 +25,14 @@ gui::ElementPtr GetElement(const gui::ElementPtr & element, int x, int y)
 
 void Window::OnClick(gui::ElementPtr clickfocus, int mouseX, int mouseY, bool holdingShift)
 {
+    dragger = nullptr;
     if(clickfocus != focus)
     {
         focus = clickfocus;
         isSelecting = false;
     }
     if(focus && focus->text.font) MoveSelectionCursor(focus->text.font->GetUnitIndex(focus->text.text, mouseX - focus->rect.x0), holdingShift);
-    if(focus && focus->onClick) focus->onClick(mouseX, mouseY);
+    if(focus) dragger = focus->OnClick(mouseX, mouseY);
 }
 
 void Window::MoveSelectionCursor(int newCursor, bool holdingShift)
@@ -202,13 +203,22 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
             }
             else w->OnClick(nullptr, 0, 0, false);
         }
+        if(action == GLFW_RELEASE)
+        {
+            if(w->dragger)
+            {
+                w->dragger->OnRelease();
+                w->dragger.reset();
+            }
+        }
     });
 
     glfwSetCursorPosCallback(window, [](GLFWwindow * window, double cx, double cy)
     {
         int x = static_cast<int>(cx), y = static_cast<int>(cy);
         auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
-        if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+        if(w->dragger) w->dragger->OnDrag(int2(cx,cy));
+        else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
         {
             if(w->focus)
             {

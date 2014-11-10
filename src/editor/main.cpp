@@ -100,6 +100,9 @@ struct Selection
     Object * object;
     GLuint selectionProgram;
 
+    Mesh arrowMesh;
+    GLuint arrowProg;
+
     Selection() : object(), selectionProgram() {}
 
     void SetSelection(Object * object)
@@ -114,7 +117,20 @@ struct Selection
     std::function<void()> onSelectionChanged;
 };
 
-struct View
+class LinearTranslationDragger : public gui::IDragger
+{
+    Object & object;
+    float3 direction, initialPosition;
+    int2 click;
+public:
+    LinearTranslationDragger(Object & object, const float3 & direction, const int2 & click) : object(object), direction(direction), initialPosition(object.position), click(click) {}
+
+    void OnDrag(int2 newMouse) { object.position = initialPosition + direction * ((newMouse.y - click.y)*0.01f); }
+    void OnRelease() {}
+    void OnCancel() { object.position = initialPosition; }
+};
+
+struct View : public gui::Element
 {
     Scene & scene;
     Selection & selection;
@@ -122,7 +138,12 @@ struct View
     float yaw=0,pitch=0;
     bool bf=0,bl=0,bb=0,br=0;
 
-    View(Scene & scene, Selection & selection) : scene(scene), selection(selection) {}
+    View(Scene & scene, Selection & selection) : scene(scene), selection(selection)
+    {
+        this->onDrag = [this](int dx, int dy) { OnDrag(dx, dy); };
+        this->onKey = [this](int key, int action, int mods) { OnKey(key, action, mods); };
+        this->onDraw = [this](const gui::Rect & rect) { OnDraw(rect); };
+    }
 
     void OnUpdate(float timestep)
     {
@@ -167,6 +188,7 @@ struct View
 
         if(selection.object)
         {
+            glPushAttrib(GL_ALL_ATTRIB_BITS);
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glDepthFunc(GL_LEQUAL);
             glEnable(GL_POLYGON_OFFSET_LINE);
@@ -175,31 +197,65 @@ struct View
             selection.object->prog = selection.selectionProgram;
             selection.object->Draw(viewProj, viewpoint.position, {});
             selection.object->prog = prog;
+            glPopAttrib();
+
+            glClear(GL_DEPTH_BUFFER_BIT);
+            auto model = TranslationMatrix(selection.object->position);
+            auto mvp = mul(viewProj, model);
+            glUseProgram(selection.arrowProg);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+            glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_eye"), 1, &viewpoint.position.x);
+            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 0.2f, 0.2f, 1.0f);
+            glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_lightPos"), 1, &scene.objects.back().position.x);
+            selection.arrowMesh.Draw();
+
+            model = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Matrix();
+            mvp = mul(viewProj, model);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 0.2f, 1.0f, 0.2f);
+            selection.arrowMesh.Draw();
+
+            model = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Matrix();
+            mvp = mul(viewProj, model);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 1.0f, 0.2f, 0.2f);
+            selection.arrowMesh.Draw();
         }
         
         glPopAttrib();
     }
 
-    gui::ElementPtr CreateViewport(const GuiFactory & factory)
+    gui::DraggerPtr OnClick(int x, int y)
     {
-        auto viewport = std::make_shared<gui::Element>();
-        viewport->onClick = [this,viewport](int x, int y) // LOL fix this
-        {
-            auto & vp = *viewport;
-            auto rect = vp.rect;
-            auto viewX = (x - rect.x0) * 2.0f / rect.GetWidth() - 1;
-            auto viewY = 1 - (y - rect.y0) * 2.0f / rect.GetHeight();
+        auto viewX = (x - rect.x0) * 2.0f / rect.GetWidth() - 1;
+        auto viewY = 1 - (y - rect.y0) * 2.0f / rect.GetHeight();
 
-            auto mat = inv(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f));
-            auto p0 = mul(mat, float4(viewX, viewY, -1, 1)), p1 = mul(mat, float4(viewX, viewY, 1, 1));
-            Ray ray = viewpoint * Ray::Between(p0.xyz()/p0.w, p1.xyz()/p1.w);
+        auto mat = inv(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f));
+        auto p0 = mul(mat, float4(viewX, viewY, -1, 1)), p1 = mul(mat, float4(viewX, viewY, 1, 1));
+        Ray ray = viewpoint * Ray::Between(p0.xyz()/p0.w, p1.xyz()/p1.w);
             
-            if(auto obj = scene.Hit(ray)) selection.SetSelection(obj);
-        };
-        viewport->onDrag = [this](int dx, int dy) { OnDrag(dx, dy); };
-        viewport->onKey = [this](int key, int action, int mods) { OnKey(key, action, mods); };
-        viewport->onDraw = [this](const gui::Rect & rect) { OnDraw(rect); };
-        return viewport;
+        if(selection.object)
+        {
+            auto localRay = ray;
+            localRay.start -= selection.object->position;
+            auto hit = selection.arrowMesh.Hit(localRay);
+            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, float3(0,0,1), int2(x,y));
+
+            localRay = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Inverse() * ray;
+            hit = selection.arrowMesh.Hit(localRay);
+            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, float3(0,1,0), int2(x,y));
+
+            localRay = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Inverse() * ray;
+            hit = selection.arrowMesh.Hit(localRay);
+            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, float3(1,0,0), int2(x,y));
+        }
+
+        if(auto obj = scene.Hit(ray)) selection.SetSelection(obj);
+
+        return {};
     }
 };
 
@@ -222,20 +278,22 @@ Mesh MakeBox(const float3 & halfDims)
 
 class Editor
 {
-    Window              window;      
-    Font                font;
-    GuiFactory          factory;
-    ListControl         objectList;
-    gui::ElementPtr     propertyPanel;
-    gui::ElementPtr     guiRoot;
-    Mesh                mesh,ground,bulb;
+    Window                  window;      
+    Font                    font;
+    GuiFactory              factory;
+    ListControl             objectList;
+    gui::ElementPtr         propertyPanel;
+    gui::ElementPtr         guiRoot;
+    Mesh                    mesh,ground,bulb;
 
-    Scene               scene;
-    Selection           selection;
-    View                view;
+    Scene                   scene;
+    Selection               selection;
+    std::shared_ptr<View>   view;
 public:
-    Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), view(scene, selection)
+    Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2)
     {
+        view = std::make_shared<View>(scene, selection);
+
         auto vs = gl::CompileShader(GL_VERTEX_SHADER, R"(#version 330
 uniform mat4 u_model;
 uniform mat4 u_modelViewProj;
@@ -275,6 +333,17 @@ void main()
         auto prog = gl::LinkProgram(vs, fs);
         selection.selectionProgram = gl::LinkProgram(vs, fs2);
 
+        for(uint32_t i=0; i<12; ++i)
+        {
+            const float a = i*6.28f/12, c = std::cos(a), s = std::sin(a);
+            selection.arrowMesh.vertices.push_back({{c*0.05f,s*0.05f,0},{c,s,0}});
+            selection.arrowMesh.vertices.push_back({{c*0.05f,s*0.05f,1},{c,s,0}});
+            selection.arrowMesh.triangles.push_back({{i*2,i*2+1,(i*2+3)%24}});
+            selection.arrowMesh.triangles.push_back({{i*2,(i*2+3)%24,(i*2+2)%24}});
+        }
+        selection.arrowMesh.Upload();
+        selection.arrowProg = prog;
+
         mesh = MakeBox({0.5f,0.5f,0.5f});
         ground = MakeBox({4,0.1f,4});
         bulb = MakeBox({0.1f,0.1f,0.1f});
@@ -285,7 +354,7 @@ void main()
             {"Gamma",{ 0.0f,1.5f,0},{1,1,0},&mesh,prog},
             {"Light",{ 0.0f,3.0f,1.0},{1,1,1},&bulb,prog},
         };
-        view.viewpoint.position = {0,1,4};
+        view->viewpoint.position = {0,1,4};
 
         for(auto & obj : scene.objects)
         {
@@ -296,7 +365,7 @@ void main()
         auto topRightPanel = factory.AddBorder(4, gui::BORDER, objectList.GetPanel());
         auto bottomRightPanel = factory.AddBorder(4, gui::BORDER, propertyPanel);
         auto rightPanel = factory.MakeNSSizer(topRightPanel, bottomRightPanel, 200);
-        guiRoot = factory.MakeWESizer(view.CreateViewport(factory), rightPanel, -400);
+        guiRoot = factory.MakeWESizer(view, rightPanel, -400);
     
         selection.onSelectionChanged = [this]()
         {
@@ -337,7 +406,7 @@ void main()
             const auto timestep = static_cast<float>(t1 - t0);
             t0 = t1;
 
-            view.OnUpdate(timestep);
+            view->OnUpdate(timestep);
             window.Redraw();
         }
         return 0;
