@@ -87,6 +87,7 @@ namespace gui
         virtual void                                        OnChar(uint32_t codepoint) {}
         virtual void                                        OnKey(GLFWwindow * window, int key, int action, int mods) {}
         virtual DraggerPtr                                  OnClick(const MouseEvent & e) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
+        virtual void                                        OnTab() {}
     };
 
     typedef std::shared_ptr<Element> ElementPtr;

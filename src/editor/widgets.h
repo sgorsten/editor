@@ -83,6 +83,7 @@ public:
     void OnChar(uint32_t codepoint) override;
     void OnKey(GLFWwindow * window, int key, int action, int mods) override;
     gui::DraggerPtr OnClick(const gui::MouseEvent & e) override;
+    void OnTab() override { SelectAll(); }
     NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
 
     std::function<void(const std::string &)> onEdit;

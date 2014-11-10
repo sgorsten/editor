@@ -212,7 +212,8 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
                 else
                 {
                     w->OnClick(*focusIt, 0, 0, false);
-                    //w->SelectAll();
+                    w->focus->OnTab();
+                    w->dragger = nullptr; // TODO: Don't simulate tab with a click
                 }
             }
             if(!w->focus)
@@ -220,7 +221,8 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
                 if(!w->tabStops.empty())
                 {
                     w->OnClick(w->tabStops.front(), 0, 0, false);
-                    //w->SelectAll();
+                    w->focus->OnTab();
+                    w->dragger = nullptr; // TODO: Don't simulate tab with a click
                 }
             }
             return;
