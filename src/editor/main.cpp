@@ -397,10 +397,10 @@ void main()
         };
         view->viewpoint.position = {0,1,4};
 
-        objectList = std::make_shared<ListBox>();
+        objectList = std::make_shared<ListBox>(font, 2);
         for(auto & obj : scene.objects)
         {
-            objectList->AddItem(factory, obj.name);
+            objectList->AddItem(obj.name);
         }
 
         propertyPanel = std::make_shared<gui::Element>();

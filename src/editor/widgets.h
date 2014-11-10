@@ -6,67 +6,20 @@
 #include <sstream>
 #include <algorithm>
 
-class GuiFactory
-{
-    const Font & font;
-    int spacing, editBorder;
-public:
-    GuiFactory(const Font & font, int spacing) : font(font), spacing(spacing), editBorder(2) {}
-
-    gui::ElementPtr MakeLabel(const std::string & text) const;
-    gui::ElementPtr MakePropertyMap(std::vector<std::pair<std::string, gui::ElementPtr>> properties) const
-    {
-        int y0 = 0;
-        auto panel = std::make_shared<gui::Element>();
-        for(auto & pair : properties)
-        {
-            int y1 = y0 + editBorder;
-            int y2 = y1 + font.GetLineHeight();
-            int y3 = y2 + editBorder;
-            panel->children.push_back({{{0,0},{0,y1},{0.5,-spacing*0.5f},{0,y2}}, MakeLabel(pair.first)});
-            panel->children.push_back({{{0.5,spacing*0.5f},{0,y0},{1,0},{0,y3}}, pair.second});
-            y0 = y3 + spacing;
-        }
-        return panel;
-    }
-
-    gui::ElementPtr MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit={}) const;
-    gui::ElementPtr MakeStringEdit(std::string & value) const
-    {
-        std::ostringstream ss;
-        ss << value; 
-        return MakeEdit(ss.str(), [&value](const std::string & text) { value = text; });
-    }
-    gui::ElementPtr MakeFloatEdit(float & value) const
-    {
-        std::ostringstream ss;
-        ss << value; 
-        return MakeEdit(ss.str(), [&value](const std::string & text) { std::istringstream(text) >> value; });
-    }
-    gui::ElementPtr MakeVectorEdit(float3 & value) const
-    {
-        auto panel = std::make_shared<gui::Element>();
-        panel->children.push_back({{{0.0f/3, 0},{0,0},{1.0f/3,-spacing*2.0f/3},{1,0}},MakeFloatEdit(value.x)});
-        panel->children.push_back({{{1.0f/3,+spacing*1.0f/3},{0,0},{2.0f/3,-spacing*1.0f/3},{1,0}},MakeFloatEdit(value.y)});
-        panel->children.push_back({{{2.0f/3,+spacing*2.0f/3},{0,0},{3.0f/3, 0},{1,0}},MakeFloatEdit(value.z)});
-        return panel;
-    }
-};
-
 class Text : public gui::Element
 {
+    const Font & font;
     size_t cursor, mark;
     bool isSelecting;
 
     const char * GetFocusText() const { return text.data(); }
     size_t GetFocusTextSize() const { return text.size(); }   
 public:
-    const Font * font;
     std::string text;
     bool isEditable;
     NVGcolor color;
 
-    Text() : cursor(), mark(), isSelecting(), font(), isEditable(), color(nvgRGBA(255,255,255,255)) {}
+    Text(const Font & font) : font(font), cursor(), mark(), isSelecting(), isEditable(), color(nvgRGBA(255,255,255,255)) {}
 
     size_t GetSelectionLeftIndex() const { return std::min(cursor, mark); }
     size_t GetSelectionRightIndex() const { return std::max(cursor, mark); }
@@ -87,21 +40,6 @@ public:
     NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
 
     std::function<void(const std::string &)> onEdit;
-};
-
-class ListBox : public gui::Element
-{
-    int selectedIndex;
-public:
-    ListBox() : selectedIndex(-1) {}
-
-    int GetSelectedIndex() const { return selectedIndex; }
-
-    void SetSelectedIndex(int index);
-    void SetItemText(int index, const std::string & text);
-    void AddItem(const GuiFactory & factory, const std::string & text);
-
-    std::function<void()> onSelectionChanged;
 };
 
 class Splitter : public gui::Element
@@ -127,22 +65,80 @@ public:
     static std::shared_ptr<Border> CreateEditBorder(gui::ElementPtr inner);
 };
 
-inline gui::ElementPtr GuiFactory::MakeLabel(const std::string & text) const 
+class ListBox : public gui::Element
 {
-    auto elem = std::make_shared<Text>();
-    elem->font = &font;
-    elem->text = text;
-    return elem;
-}
+    const Font & font;
+    int spacing, selectedIndex;
+public:
+    ListBox(const Font & font, int spacing) : font(font), spacing(spacing), selectedIndex(-1) {}
 
-inline gui::ElementPtr GuiFactory::MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit) const 
-{ 
-    auto elem = std::make_shared<Text>();
-    elem->font = &font;
-    elem->text = text;
-    elem->isEditable = true;
-    elem->onEdit = onEdit;
-    return Border::CreateEditBorder(elem);
-}
+    int GetSelectedIndex() const { return selectedIndex; }
+
+    void SetSelectedIndex(int index);
+    void SetItemText(int index, const std::string & text);
+    void AddItem(const std::string & text);
+
+    std::function<void()> onSelectionChanged;
+};
+
+class GuiFactory
+{
+    const Font & font;
+    int spacing, editBorder;
+public:
+    GuiFactory(const Font & font, int spacing) : font(font), spacing(spacing), editBorder(2) {}
+
+    gui::ElementPtr MakeLabel(const std::string & text) const
+    {
+        auto elem = std::make_shared<Text>(font);
+        elem->text = text;
+        return elem;
+    }
+
+    gui::ElementPtr MakePropertyMap(std::vector<std::pair<std::string, gui::ElementPtr>> properties) const
+    {
+        int y0 = 0;
+        auto panel = std::make_shared<gui::Element>();
+        for(auto & pair : properties)
+        {
+            int y1 = y0 + editBorder;
+            int y2 = y1 + font.GetLineHeight();
+            int y3 = y2 + editBorder;
+            panel->children.push_back({{{0,0},{0,y1},{0.5,-spacing*0.5f},{0,y2}}, MakeLabel(pair.first)});
+            panel->children.push_back({{{0.5,spacing*0.5f},{0,y0},{1,0},{0,y3}}, pair.second});
+            y0 = y3 + spacing;
+        }
+        return panel;
+    }
+
+    gui::ElementPtr MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit={}) const
+    { 
+        auto elem = std::make_shared<Text>(font);
+        elem->text = text;
+        elem->isEditable = true;
+        elem->onEdit = onEdit;
+        return Border::CreateEditBorder(elem);
+    }
+    gui::ElementPtr MakeStringEdit(std::string & value) const
+    {
+        std::ostringstream ss;
+        ss << value; 
+        return MakeEdit(ss.str(), [&value](const std::string & text) { value = text; });
+    }
+    gui::ElementPtr MakeFloatEdit(float & value) const
+    {
+        std::ostringstream ss;
+        ss << value; 
+        return MakeEdit(ss.str(), [&value](const std::string & text) { std::istringstream(text) >> value; });
+    }
+    gui::ElementPtr MakeVectorEdit(float3 & value) const
+    {
+        auto panel = std::make_shared<gui::Element>();
+        panel->children.push_back({{{0.0f/3, 0},{0,0},{1.0f/3,-spacing*2.0f/3},{1,0}},MakeFloatEdit(value.x)});
+        panel->children.push_back({{{1.0f/3,+spacing*1.0f/3},{0,0},{2.0f/3,-spacing*1.0f/3},{1,0}},MakeFloatEdit(value.y)});
+        panel->children.push_back({{{2.0f/3,+spacing*2.0f/3},{0,0},{3.0f/3, 0},{1,0}},MakeFloatEdit(value.z)});
+        return panel;
+    }
+};
 
 #endif

@@ -133,51 +133,47 @@ void Text::OnKey(GLFWwindow * window, int key, int action, int mods)
     }
 }
 
-class TextDragger : public gui::IDragger
-{
-    Text & text;
-public:
-    TextDragger(Text & text) : text(text) {}
-
-    void OnDrag(int2 newMouse) override { if(text.font) text.MoveSelectionCursor(text.font->GetUnitIndex(text.text, newMouse.x - text.rect.x0), true); }
-    void OnRelease() override {}
-    void OnCancel() override {}
-};
-
 gui::DraggerPtr Text::OnClick(const gui::MouseEvent & e)
 {
+    class SelectionDragger : public gui::IDragger
+    {
+        Text & text;
+    public:
+        SelectionDragger(Text & text) : text(text) {}
+        void OnDrag(int2 newMouse) override { text.MoveSelectionCursor(text.font.GetUnitIndex(text.text, newMouse.x - text.rect.x0), true); }
+        void OnRelease() override {}
+        void OnCancel() override {}
+    };
+
     isSelecting = false;
-    if(font) MoveSelectionCursor(font->GetUnitIndex(text, e.cursor.x - rect.x0), e.shift);
-    return std::make_shared<TextDragger>(*this);
+    MoveSelectionCursor(font.GetUnitIndex(text, e.cursor.x - rect.x0), e.shift);
+    return std::make_shared<SelectionDragger>(*this);
 }
 
 NVGcolor Text::OnDrawBackground(const gui::DrawEvent & e) const
 {
-    // Skip drawing if no font has been assigned
-    if(!font) return e.parent;
-
     // Draw selection if we are selecting
     if(e.hasFocus && isSelecting)
     {
-        const int x = rect.x0 + font->GetStringWidth(text.substr(0,GetSelectionLeftIndex()));
-        const int w = font->GetStringWidth(text.substr(GetSelectionLeftIndex(),GetSelectionRightIndex()-GetSelectionLeftIndex()));
+        const int x = rect.x0 + font.GetStringWidth(text.substr(0,GetSelectionLeftIndex()));
+        const int w = font.GetStringWidth(text.substr(GetSelectionLeftIndex(),GetSelectionRightIndex()-GetSelectionLeftIndex()));
 
         nvgBeginPath(e.vg);
-        nvgRect(e.vg, x, rect.y0, w, font->GetLineHeight());
+        nvgRect(e.vg, x, rect.y0, w, font.GetLineHeight());
         nvgFillColor(e.vg, nvgRGBA(0,255,255,128));
         nvgFill(e.vg);
     }          
 
     // Draw the text itself
-    font->DrawString(rect.x0, rect.y0, color, text);
+    font.DrawString(rect.x0, rect.y0, color, text);
 
     // Draw cursor if we have focus
     if(e.hasFocus)
     {
-        int x = rect.x0 + font->GetStringWidth(text.substr(0,cursor));
+        int x = rect.x0 + font.GetStringWidth(text.substr(0,cursor));
 
         nvgBeginPath(e.vg);
-        nvgRect(e.vg, x, rect.y0, 1, font->GetLineHeight());
+        nvgRect(e.vg, x, rect.y0, 1, font.GetLineHeight());
         nvgFillColor(e.vg, nvgRGBA(255,255,255,192));
         nvgFill(e.vg);
     }
@@ -187,7 +183,7 @@ NVGcolor Text::OnDrawBackground(const gui::DrawEvent & e) const
     transparentBackground.a = 0;
     auto bg = nvgLinearGradient(e.vg, rect.x1-6, rect.y0, rect.x1, rect.y0, transparentBackground, e.parent);
     nvgBeginPath(e.vg);
-    nvgRect(e.vg, rect.x1-6, rect.y0, 6, font->GetLineHeight());
+    nvgRect(e.vg, rect.x1-6, rect.y0, 6, font.GetLineHeight());
     nvgFillPaint(e.vg, bg);
     nvgFill(e.vg);
     return e.parent;
@@ -202,12 +198,8 @@ class ListBoxItem : public Text
     ListBox & list;
     int index;
 public:
-    ListBoxItem(ListBox & list, int index) : list(list), index(index) {}
-    gui::DraggerPtr OnClick(const gui::MouseEvent & e) override
-    {
-        list.SetSelectedIndex(index);
-        return Text::OnClick(e);
-    };
+    ListBoxItem(const Font & font, ListBox & list, int index) : Text(font), list(list), index(index) {}
+    gui::DraggerPtr OnClick(const gui::MouseEvent & e) override { list.SetSelectedIndex(index); return Text::OnClick(e); };
 };
 
 void ListBox::SetSelectedIndex(int index)
@@ -232,18 +224,13 @@ void ListBox::SetItemText(int index, const std::string & text)
     child->text = text;
 }
 
-void ListBox::AddItem(const GuiFactory & factory, const std::string & text)
+void ListBox::AddItem(const std::string & text)
 {
-    auto label = factory.MakeLabel(text);
-    auto child = reinterpret_cast<Text *>(label.get()); // TODO: Fix
+    auto item = std::make_shared<ListBoxItem>(font, *this, children.size());
+    item->text = text;
 
-    auto item = std::make_shared<ListBoxItem>(*this, children.size());
-    item->color = child->color;
-    item->font = child->font;
-    item->text = child->text;
-
-    float y0 = children.empty() ? 0 : children.back().placement.y1.b+2;
-    float y1 = y0 + item->font->GetLineHeight();
+    float y0 = children.empty() ? 0 : children.back().placement.y1.b + spacing;
+    float y1 = y0 + font.GetLineHeight();
     children.push_back({{{0,0},{0,y0},{1,0},{0,y1}},item});
 }
 
