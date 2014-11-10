@@ -29,6 +29,8 @@ class Window
     // Rendering helpers
     NVGcontext * vg;
 
+    void CancelDrag();
+    void TabTo(gui::ElementPtr element);
     void OnClick(gui::ElementPtr clickfocus, int mouseX, int mouseY, bool holdingShift);
 public:
     Window(const char * title, int width, int height);

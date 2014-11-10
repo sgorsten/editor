@@ -25,11 +25,7 @@ gui::ElementPtr GetElement(const gui::ElementPtr & element, int x, int y)
 
 void Window::OnClick(gui::ElementPtr clickFocus, int mouseX, int mouseY, bool holdingShift)
 {
-    if(dragger)
-    {
-        dragger->OnRelease();
-        dragger = nullptr;
-    }
+    CancelDrag();
     
     if(focus != clickFocus)
     {
@@ -40,6 +36,23 @@ void Window::OnClick(gui::ElementPtr clickFocus, int mouseX, int mouseY, bool ho
     {
         dragger = focus->OnClick({{mouseX, mouseY}, holdingShift});
     }
+}
+
+void Window::CancelDrag()
+{
+    if(dragger)
+    {
+        dragger->OnCancel();
+        dragger = nullptr;
+    }
+}
+
+void Window::TabTo(gui::ElementPtr element)
+{
+    CancelDrag();
+
+    focus = element;
+    if(focus) focus->OnTab();
 }
 
 Window::Window(const char * title, int width, int height) : window(), width(width), height(height), focus(), vg()
@@ -198,33 +211,16 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
         if(action != GLFW_RELEASE) switch(key)
         {
         case GLFW_KEY_ESCAPE: // Escape cancels the current dragger
-            if(w->dragger)
-            {
-                w->dragger->OnCancel();
-                w->dragger.reset();
-            }
+            w->CancelDrag();
             return;
         case GLFW_KEY_TAB: // Tab iterates through editable controls
             if(w->focus)
             {
                 auto focusIt = std::find(begin(w->tabStops), end(w->tabStops), w->focus);
-                if(focusIt == end(w->tabStops) || ++focusIt == end(w->tabStops)) w->OnClick(nullptr, 0, 0, false);
-                else
-                {
-                    w->OnClick(*focusIt, 0, 0, false);
-                    w->focus->OnTab();
-                    w->dragger = nullptr; // TODO: Don't simulate tab with a click
-                }
+                if(focusIt == end(w->tabStops) || ++focusIt == end(w->tabStops)) w->TabTo(nullptr);
+                else w->TabTo(*focusIt);
             }
-            if(!w->focus)
-            {
-                if(!w->tabStops.empty())
-                {
-                    w->OnClick(w->tabStops.front(), 0, 0, false);
-                    w->focus->OnTab();
-                    w->dragger = nullptr; // TODO: Don't simulate tab with a click
-                }
-            }
+            if(!w->focus && !w->tabStops.empty()) w->TabTo(w->tabStops.front());
             return;
         }
 
@@ -276,30 +272,15 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
 void Window::Redraw()
 {
     glfwMakeContextCurrent(window);
-
     glPushAttrib(GL_ALL_ATTRIB_BITS);
-
     glViewport(0, 0, width, height);
     glClearColor(0,0,1,0);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glOrtho(0, width, height, 0, -1, +1);
-
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-
     nvgBeginFrame(vg, width, height, 1.0f);
-
     DrawElement(vg, *root, focus.get(), nvgRGBA(0,0,0,0));
     nvgEndFrame(vg);
 
-    glPopMatrix();
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
     glPopAttrib();
-
     glfwSwapBuffers(window);
 }
