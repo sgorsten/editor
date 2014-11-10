@@ -58,14 +58,19 @@ class Text : public gui::Element
     size_t cursor, mark;
     bool isSelecting;
 
-    const char * GetFocusText() const { return text.text.data(); }
-    size_t GetFocusTextSize() const { return text.text.size(); }   
+    const char * GetFocusText() const { return text.data(); }
+    size_t GetFocusTextSize() const { return text.size(); }   
 public:
+    const Font * font;
+    std::string text;
+    bool isEditable;
+    NVGcolor color;
+
     Text() : cursor(), mark(), isSelecting() {}
 
     size_t GetSelectionLeftIndex() const { return std::min(cursor, mark); }
     size_t GetSelectionRightIndex() const { return std::max(cursor, mark); }
-    std::string GetSelectionText() const { return std::string(text.text.c_str() + GetSelectionLeftIndex(), text.text.c_str() + GetSelectionRightIndex()); }
+    std::string GetSelectionText() const { return std::string(text.c_str() + GetSelectionLeftIndex(), text.c_str() + GetSelectionRightIndex()); }
 
     void SelectAll();
     void MoveSelectionCursor(int newCursor, bool holdingShift);
@@ -121,15 +126,21 @@ public:
 inline gui::ElementPtr GuiFactory::MakeLabel(const std::string & text) const 
 {
     auto elem = std::make_shared<Text>();
-    elem->text = {{1,1,1,1},&font,text,false};
+    elem->color = nvgRGBA(255,255,255,255);
+    elem->font = &font;
+    elem->text = text;
+    elem->isEditable = false;
     return elem;
 }
 
 inline gui::ElementPtr GuiFactory::MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit) const 
 { 
     auto elem = std::make_shared<Text>();
-    //elem->cursor = gui::Cursor::IBeam;
-    elem->text = {{1,1,1,1}, &font, text, true};
+    elem->gui::Element::cursor = gui::Cursor::IBeam;
+    elem->color = nvgRGBA(255,255,255,255);
+    elem->font = &font;
+    elem->text = text;
+    elem->isEditable = true;
     elem->onEdit = onEdit;
     return Border::CreateEditBorder(elem);
 }

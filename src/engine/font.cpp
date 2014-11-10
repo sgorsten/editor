@@ -47,16 +47,17 @@ size_t Font::GetUnitIndex(const std::string & string, int x) const
     return n;
 }
 
-void Font::DrawString(int x, int y, float r, float g, float b, const std::string & string) const
+void Font::DrawString(int x, int y, NVGcolor color, const std::string & string) const
 {
     nvgFontSize(vg, pixelHeight);
 	nvgFontFace(vg, name.c_str());
 	nvgTextAlign(vg, NVG_ALIGN_LEFT|NVG_ALIGN_TOP);
     if(dropShadow)
     {
-	    nvgFillColor(vg, nvgRGBA(0,0,0,255));
+        
+	    nvgFillColor(vg, nvgRGBA(0,0,0,color.a));
 	    nvgText(vg, x+1, y+1, string.c_str(), nullptr);
     }
-	nvgFillColor(vg, nvgRGBA(r*255,g*255,b*255,255));
+	nvgFillColor(vg, color);
 	nvgText(vg, x, y, string.c_str(), nullptr);
 }

@@ -2,6 +2,7 @@
 #define ENGINE_FONT_H
 
 #include "gl.h"
+#include "nanovg.h"
 
 #include <cstdint>
 #include <string>
@@ -23,7 +24,7 @@ public:
     int GetStringWidth(const std::string & s) const;
     size_t GetUnitIndex(const std::string & s, int x) const;
 
-    void DrawString(int x, int y, float r, float g, float b, const std::string & s) const;
+    void DrawString(int x, int y, NVGcolor color, const std::string & s) const;
 };
 
 #endif

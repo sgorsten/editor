@@ -74,17 +74,8 @@ namespace gui
 
     struct Element
     {
-        struct TextComponent
-        {
-            Color color;
-            const Font * font;
-            std::string text;
-            bool isEditable;
-        };
-
         Cursor                                              cursor;
         Style                                               style;
-        TextComponent                                       text;
         Rect                                                rect;
         std::vector<Child>                                  children;
 

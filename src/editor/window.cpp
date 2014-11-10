@@ -239,7 +239,7 @@ Window::~Window()
 
 static void CollectTabStops(std::vector<gui::ElementPtr> & tabStops, const gui::ElementPtr & elem)
 {
-    if(elem->text.isEditable) tabStops.push_back(elem);
+    //if(elem->text.isEditable) tabStops.push_back(elem);
     for(auto & child : elem->children) CollectTabStops(tabStops, child.element);
 }
 
