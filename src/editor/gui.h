@@ -55,8 +55,6 @@ namespace gui
 
     struct Child;
 
-    enum Style { NONE, BACKGROUND, BORDER, EDIT };
-
     struct MouseEvent
     {
         int2 cursor;
@@ -74,23 +72,21 @@ namespace gui
 
     struct Element
     {
-        Cursor                                              cursor;
-        Style                                               style;
         Rect                                                rect;
         std::vector<Child>                                  children;
-
-        virtual void                                        OnChar(uint32_t codepoint) {}
-        virtual void                                        OnKey(GLFWwindow * window, int key, int action, int mods) {}
-        virtual DraggerPtr                                  OnClick(const MouseEvent & e) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
-
-        virtual NVGcolor                                    OnDrawBackground(const DrawEvent & e) const { return e.parent; } // Draw contents before children
-        virtual void                                        OnDrawForeground(const DrawEvent & e) const {} // Draw contents after children
-
-        std::function<void(const std::string & text)>       onEdit;
         
                                                             Element();
 
         void                                                SetRect(const Rect & rect);
+
+        virtual bool                                        IsTabStop() const { return false; }
+        virtual Cursor                                      GetCursor() const { return Cursor::Arrow; }
+        virtual NVGcolor                                    OnDrawBackground(const DrawEvent & e) const { return e.parent; } // Draw contents before children
+        virtual void                                        OnDrawForeground(const DrawEvent & e) const {} // Draw contents after children
+
+        virtual void                                        OnChar(uint32_t codepoint) {}
+        virtual void                                        OnKey(GLFWwindow * window, int key, int action, int mods) {}
+        virtual DraggerPtr                                  OnClick(const MouseEvent & e) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
     };
 
     typedef std::shared_ptr<Element> ElementPtr;

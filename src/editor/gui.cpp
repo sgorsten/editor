@@ -3,7 +3,7 @@
 
 namespace gui
 {
-    Element::Element() : cursor(Cursor::Arrow), style(NONE), rect({}) {}
+    Element::Element() : rect({}) {}
 
     void Element::SetRect(const Rect & rect)
     {

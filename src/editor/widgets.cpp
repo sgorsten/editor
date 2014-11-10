@@ -288,7 +288,8 @@ class SplitterBorder : public gui::Element
     gui::Element & panel;
     DimensionDesc dim;
 public:
-    SplitterBorder(gui::Element & panel, const DimensionDesc & dim) : panel(panel), dim(dim) { cursor = dim.cursor; style = gui::BACKGROUND; }
+    SplitterBorder(gui::Element & panel, const DimensionDesc & dim) : panel(panel), dim(dim) {}
+    gui::Cursor GetCursor() const override { return dim.cursor; }
     gui::DraggerPtr OnClick(const gui::MouseEvent & e) override { return std::make_shared<Dragger>(panel, dim, e.cursor); }
 
     NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override

@@ -66,7 +66,7 @@ public:
     bool isEditable;
     NVGcolor color;
 
-    Text() : cursor(), mark(), isSelecting() {}
+    Text() : cursor(), mark(), isSelecting(), font(), isEditable(), color(nvgRGBA(255,255,255,255)) {}
 
     size_t GetSelectionLeftIndex() const { return std::min(cursor, mark); }
     size_t GetSelectionRightIndex() const { return std::max(cursor, mark); }
@@ -76,6 +76,9 @@ public:
     void MoveSelectionCursor(int newCursor, bool holdingShift);
     void RemoveSelection();
     void Insert(const char * string);
+
+    bool IsTabStop() const override { return isEditable; }
+    gui::Cursor GetCursor() const override { return isEditable ? gui::Cursor::IBeam : gui::Cursor::Arrow; }
 
     void OnChar(uint32_t codepoint) override;
     void OnKey(GLFWwindow * window, int key, int action, int mods) override;
@@ -126,18 +129,14 @@ public:
 inline gui::ElementPtr GuiFactory::MakeLabel(const std::string & text) const 
 {
     auto elem = std::make_shared<Text>();
-    elem->color = nvgRGBA(255,255,255,255);
     elem->font = &font;
     elem->text = text;
-    elem->isEditable = false;
     return elem;
 }
 
 inline gui::ElementPtr GuiFactory::MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit) const 
 { 
     auto elem = std::make_shared<Text>();
-    elem->gui::Element::cursor = gui::Cursor::IBeam;
-    elem->color = nvgRGBA(255,255,255,255);
     elem->font = &font;
     elem->text = text;
     elem->isEditable = true;

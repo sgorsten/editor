@@ -184,7 +184,7 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
         else
         {
             auto elem = GetElement(w->root, x, y);
-            glfwSetCursor(window, w->cursors[(int)elem->cursor]);
+            glfwSetCursor(window, w->cursors[(int)elem->GetCursor()]);
         }
         w->lastX = x;
         w->lastY = y;
@@ -239,7 +239,7 @@ Window::~Window()
 
 static void CollectTabStops(std::vector<gui::ElementPtr> & tabStops, const gui::ElementPtr & elem)
 {
-    //if(elem->text.isEditable) tabStops.push_back(elem);
+    if(elem->IsTabStop()) tabStops.push_back(elem);
     for(auto & child : elem->children) CollectTabStops(tabStops, child.element);
 }
 
