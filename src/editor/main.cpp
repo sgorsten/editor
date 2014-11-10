@@ -125,15 +125,13 @@ class Raycaster
 public:
     Raycaster(const gui::Rect & rect, const float4x4 & proj, const Pose & viewpoint) : rect(rect), invProj(inv(proj)), viewpoint(viewpoint) {}
 
-    Ray ComputeRay(int x, int y) const
+    Ray ComputeRay(const int2 & pixel) const
     {
-        auto viewX = (x - rect.x0) * 2.0f / rect.GetWidth() - 1;
-        auto viewY = 1 - (y - rect.y0) * 2.0f / rect.GetHeight();
+        auto viewX = (pixel.x - rect.x0) * 2.0f / rect.GetWidth() - 1;
+        auto viewY = 1 - (pixel.y - rect.y0) * 2.0f / rect.GetHeight();
         return viewpoint * Ray::Between(TransformCoordinate(invProj, {viewX, viewY, -1}), TransformCoordinate(invProj, {viewX, viewY, 1}));
     }
 };
-
-#include <iostream>
 
 class LinearTranslationDragger : public gui::IDragger
 {
@@ -141,36 +139,18 @@ class LinearTranslationDragger : public gui::IDragger
     Raycaster caster;
     float3 direction, initialPosition;
     float initialS;
-public:
-    LinearTranslationDragger(Object & object, const Raycaster & caster, const float3 & direction, const int2 & click) : object(object), caster(caster), direction(direction), initialPosition(object.position) 
+
+    float ComputeS(const int2 & mouse) const
     {
-        Ray ray1 = {initialPosition, direction}, ray2 = caster.ComputeRay(click.x, click.y);
-
-        auto r12 = ray2.start - ray1.start;
-        auto e1e2 = dot(ray1.direction, ray2.direction);
-        auto denom = 1 - e1e2*e1e2;
-        auto r12e1 = dot(r12,ray1.direction), r12e2 = dot(r12,ray2.direction);
-        auto s = (r12e1 - r12e2*e1e2) / denom;
-
-        initialS = s;
+        const Ray ray1 = {initialPosition, direction}, ray2 = caster.ComputeRay(mouse);
+        const auto r12 = ray2.start - ray1.start;
+        const auto e1e2 = dot(ray1.direction, ray2.direction), denom = 1 - e1e2*e1e2;
+        return (dot(r12,ray1.direction) - dot(r12,ray2.direction)*e1e2) / denom;
     }
+public:
+    LinearTranslationDragger(Object & object, const Raycaster & caster, const float3 & direction, const int2 & click) : object(object), caster(caster), direction(direction), initialPosition(object.position), initialS(ComputeS(click)) {}
 
-    void OnDrag(int2 newMouse)
-    { 
-        Ray ray1 = {initialPosition, direction}, ray2 = caster.ComputeRay(newMouse.x, newMouse.y);
-
-        auto r12 = ray2.start - ray1.start;
-        auto e1e2 = dot(ray1.direction, ray2.direction);
-        auto denom = 1 - e1e2*e1e2;
-        auto r12e1 = dot(r12,ray1.direction), r12e2 = dot(r12,ray2.direction);
-        auto s = (r12e1 - r12e2*e1e2) / denom;
-
-        auto newS = s;
-
-        auto amt = newS - initialS;
-
-        object.position = initialPosition + direction * amt;
-    }
+    void OnDrag(int2 newMouse) { object.position = initialPosition + direction * (ComputeS(newMouse) - initialS); }
     void OnRelease() {}
     void OnCancel() { object.position = initialPosition; }
 };
@@ -276,7 +256,7 @@ struct View : public gui::Element
     gui::DraggerPtr OnClick(int x, int y)
     {
         Raycaster caster(rect, PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f), viewpoint);
-        Ray ray = caster.ComputeRay(x,y);
+        Ray ray = caster.ComputeRay({x,y});
             
         if(selection.object)
         {
