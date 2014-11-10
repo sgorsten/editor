@@ -68,13 +68,13 @@ namespace gui
         Rect                                                rect;
         std::vector<Child>                                  children;
 
-        virtual DraggerPtr                                  OnClick(int x, int y) { return nullptr; }
+        virtual DraggerPtr                                  OnClick(const int2 & mouse) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
+        virtual void                                        OnKey(int key, int action, int mods) {}
 
-        std::function<void(int dx, int dy)>                 onDrag;
+        virtual void                                        OnDrawBackground() const {} // Draw contents before children
+        virtual void                                        OnDrawForeground() const {} // Draw contents after children
+
         std::function<void(const std::string & text)>       onEdit;
-        std::function<void(const Rect & rect)>              onDraw;        
-
-        std::function<void(int key, int action, int mods)>  onKey;
         
                                                             Element();
 

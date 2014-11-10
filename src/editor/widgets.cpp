@@ -12,7 +12,7 @@ class ListBoxItem : public gui::Element
     int index;
 public:
     ListBoxItem(ListBox & list, int index) : list(list), index(index) {}
-    gui::DraggerPtr OnClick(int x, int y) { list.SetSelectedIndex(index); return {}; };
+    gui::DraggerPtr OnClick(const int2 &) override { list.SetSelectedIndex(index); return {}; };
 };
 
 void ListBox::SetSelectedIndex(int index)
@@ -60,6 +60,14 @@ class SplitterBorder : public gui::Element
         gui::URect initialPlacement;
         DimensionDesc dim;
         int click;
+
+        void SetBorderPlacement(const gui::URect & placement)
+        {
+            panel.children[0].placement = placement;
+            panel.children[1].placement.*dim.u1 = placement.*dim.u0;
+            panel.children[2].placement.*dim.u0 = placement.*dim.u1;
+            panel.SetRect(panel.rect);
+        }
     public:
         Dragger(gui::Element & panel, const DimensionDesc & dim, const int2 & click) : panel(panel), initialPlacement(panel.children[0].placement), dim(dim), click(click.*dim.coord) {}
         void OnDrag(int2 newMouse) override
@@ -71,20 +79,17 @@ class SplitterBorder : public gui::Element
             auto placement = initialPlacement;
             (placement.*dim.u0).b += delta;
             (placement.*dim.u1).b += delta;
-            panel.children[0].placement = placement;
-            panel.children[1].placement.*dim.u1 = placement.*dim.u0;
-            panel.children[2].placement.*dim.u0 = placement.*dim.u1;
-            panel.SetRect(panel.rect);
+            SetBorderPlacement(placement);
         }
         void OnRelease() override {}
-        void OnCancel() override {}
+        void OnCancel() override { SetBorderPlacement(initialPlacement); }
     };
 
     gui::Element & panel;
     DimensionDesc dim;
 public:
     SplitterBorder(gui::Element & panel, const DimensionDesc & dim) : panel(panel), dim(dim) { cursor = dim.cursor; style = gui::BACKGROUND; }
-    gui::DraggerPtr OnClick(int x, int y) override { return std::make_shared<Dragger>(panel, dim, int2(x,y)); }
+    gui::DraggerPtr OnClick(const int2 & mouse) override { return std::make_shared<Dragger>(panel, dim, mouse); }
 };
 
 Splitter::Splitter(gui::ElementPtr panelA, gui::ElementPtr panelB, Side sideB, int pixelsB)

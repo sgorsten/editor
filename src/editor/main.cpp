@@ -150,25 +150,32 @@ class LinearTranslationDragger : public gui::IDragger
 public:
     LinearTranslationDragger(Object & object, const Raycaster & caster, const float3 & direction, const int2 & click) : object(object), caster(caster), direction(direction), initialPosition(object.position), initialS(ComputeS(click)) {}
 
-    void OnDrag(int2 newMouse) { object.position = initialPosition + direction * (ComputeS(newMouse) - initialS); }
-    void OnRelease() {}
-    void OnCancel() { object.position = initialPosition; }
+    void OnDrag(int2 newMouse) override { object.position = initialPosition + direction * (ComputeS(newMouse) - initialS); }
+    void OnRelease() override {}
+    void OnCancel() override { object.position = initialPosition; }
 };
 
 struct View : public gui::Element
 {
+    class MouselookDragger : public gui::IDragger
+    {
+        View & view;
+        int2 lastMouse;
+    public:
+        MouselookDragger(View & view, const int2 & click) : view(view), lastMouse(click) {}
+
+        void OnDrag(int2 newMouse) override { view.OnDrag(newMouse - lastMouse); lastMouse = newMouse; }
+        void OnRelease() override {}
+        void OnCancel() override {}
+    };
+
     Scene & scene;
     Selection & selection;
     Pose viewpoint;
     float yaw=0,pitch=0;
     bool bf=0,bl=0,bb=0,br=0;
 
-    View(Scene & scene, Selection & selection) : scene(scene), selection(selection)
-    {
-        this->onDrag = [this](int dx, int dy) { OnDrag(dx, dy); };
-        this->onKey = [this](int key, int action, int mods) { OnKey(key, action, mods); };
-        this->onDraw = [this](const gui::Rect & rect) { OnDraw(rect); };
-    }
+    View(Scene & scene, Selection & selection) : scene(scene), selection(selection) {}
 
     void OnUpdate(float timestep)
     {
@@ -180,14 +187,14 @@ struct View : public gui::Element
         if(mag2(dir) > 0) viewpoint.position = viewpoint.TransformCoord(norm(dir) * (timestep * 8));
     }
 
-    void OnDrag(int dx, int dy)
+    void OnDrag(const int2 & delta)
     {
-        yaw -= dx * 0.01f;
-        pitch -= dy * 0.01f;
+        yaw -= delta.x * 0.01f;
+        pitch -= delta.y * 0.01f;
         viewpoint.orientation = qmul(RotationQuaternion({0,1,0}, yaw), RotationQuaternion({1,0,0}, pitch));
     }
     
-    void OnKey(int key, int action, int mods)
+    void OnKey(int key, int action, int mods) override
     {
         switch(key)
         {
@@ -198,7 +205,7 @@ struct View : public gui::Element
         }
     }
 
-    void OnDraw(const gui::Rect & rect) const
+    void OnDrawBackground() const override
     {
         glPushAttrib(GL_ALL_ATTRIB_BITS);
         glViewport(rect.x0, rect.y0, rect.x1-rect.x0, rect.y1-rect.y0);
@@ -253,30 +260,30 @@ struct View : public gui::Element
         glPopAttrib();
     }
 
-    gui::DraggerPtr OnClick(int x, int y)
+    gui::DraggerPtr OnClick(const int2 & mouse) override
     {
         Raycaster caster(rect, PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f), viewpoint);
-        Ray ray = caster.ComputeRay({x,y});
+        Ray ray = caster.ComputeRay(mouse);
             
         if(selection.object)
         {
             auto localRay = ray;
             localRay.start -= selection.object->position;
             auto hit = selection.arrowMesh.Hit(localRay);
-            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,0,1), int2(x,y));
+            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,0,1), mouse);
 
             localRay = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Inverse() * ray;
             hit = selection.arrowMesh.Hit(localRay);
-            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,1,0), int2(x,y));
+            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,1,0), mouse);
 
             localRay = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Inverse() * ray;
             hit = selection.arrowMesh.Hit(localRay);
-            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(1,0,0), int2(x,y));
+            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(1,0,0), mouse);
         }
 
         if(auto obj = scene.Hit(ray)) selection.SetSelection(obj);
 
-        return {};
+        return std::make_shared<MouselookDragger>(*this, mouse);
     }
 };
 

@@ -32,7 +32,7 @@ void Window::OnClick(gui::ElementPtr clickfocus, int mouseX, int mouseY, bool ho
         isSelecting = false;
     }
     if(focus && focus->text.font) MoveSelectionCursor(focus->text.font->GetUnitIndex(focus->text.text, mouseX - focus->rect.x0), holdingShift);
-    if(focus) dragger = focus->OnClick(mouseX, mouseY);
+    if(focus) dragger = focus->OnClick({mouseX, mouseY});
 }
 
 void Window::MoveSelectionCursor(int newCursor, bool holdingShift)
@@ -226,10 +226,6 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
                 {
                     w->MoveSelectionCursor(w->focus->text.font->GetUnitIndex(w->focus->text.text, x - w->focus->rect.x0), true);
                 }
-                else if(w->focus->onDrag)
-                {
-                   w->focus->onDrag(x - w->lastX, y - w->lastY);
-                }
             }
         }
         else
@@ -245,10 +241,17 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
     {
         auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
 
-        // First handle tabbing behavior
-        if(key == GLFW_KEY_TAB)
+        // Handle certain global UI keys
+        if(action != GLFW_RELEASE) switch(key)
         {
-            if(action == GLFW_RELEASE) return;
+        case GLFW_KEY_ESCAPE: // Escape cancels the current dragger
+            if(w->dragger)
+            {
+                w->dragger->OnCancel();
+                w->dragger.reset();
+            }
+            return;
+        case GLFW_KEY_TAB: // Tab iterates through editable controls
             if(w->focus)
             {
                 auto focusIt = std::find(begin(w->tabStops), end(w->tabStops), w->focus);
@@ -344,7 +347,7 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
         }
             
         // Finally, dispatch to custom key handler if one is present
-        if(w->focus->onKey) w->focus->onKey(key, action, mods);
+        w->focus->OnKey(key, action, mods);
     });
 }
 
@@ -377,14 +380,14 @@ void Window::SetGuiRoot(gui::ElementPtr element)
 
 static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * focus, size_t cursorIndex, size_t selectLeft, size_t selectRight, NVGcolor parentBackground)
 {
-    if(elem.onDraw)
+    elem.OnDrawBackground();
+
+    nvgSave(vg);
+
+    // Compute the background color for this element
+    NVGcolor background = parentBackground;
+    if(elem.style != gui::NONE)
     {
-        elem.onDraw(elem.rect);
-    }
-    else
-    {
-        // Compute the background color for this element
-        NVGcolor background = parentBackground;
         int minSize = 0;
         switch(elem.style)
         {    
@@ -409,93 +412,94 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
 	        nvgFill(vg);
         }
         if(parentBackground.a == 0) parentBackground = background; // If there was no parent color, reuse this color
+    }
 
-        // Begin scissoring to client rect
-    	nvgSave(vg);
-	    nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+    // Begin scissoring to client rect
+	nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
 
-        // If we have an assigned font, handle rendering of text component
-        if(elem.text.font)
+    // If we have an assigned font, handle rendering of text component
+    if(elem.text.font)
+    {
+        const auto & font = *elem.text.font;
+
+        if(&elem == focus && selectLeft < selectRight)
         {
-            const auto & font = *elem.text.font;
+            const int x = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,selectLeft));
+            const int w = font.GetStringWidth(elem.text.text.substr(selectLeft,selectRight-selectLeft));
 
-            if(&elem == focus && selectLeft < selectRight)
-            {
-                const int x = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,selectLeft));
-                const int w = font.GetStringWidth(elem.text.text.substr(selectLeft,selectRight-selectLeft));
-
-                nvgBeginPath(vg);
-                nvgRect(vg, x, elem.rect.y0, w, font.GetLineHeight());
-                nvgFillColor(vg, nvgRGBA(0,255,255,128));
-                nvgFill(vg);
-            }          
-
-            font.DrawString(elem.rect.x0, elem.rect.y0, elem.text.color.r, elem.text.color.g, elem.text.color.b, elem.text.text);
-
-            if(&elem == focus)
-            {
-                int x = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,cursorIndex));
-
-                nvgBeginPath(vg);
-                nvgRect(vg, x, elem.rect.y0, 1, font.GetLineHeight());
-                nvgFillColor(vg, nvgRGBA(255,255,255,192));
-                nvgFill(vg);
-            }
-
-            auto transparentBackground = parentBackground;
-            transparentBackground.a = 0;
-            auto bg = nvgLinearGradient(vg, elem.rect.x1-6, elem.rect.y0, elem.rect.x1, elem.rect.y0, transparentBackground, parentBackground);
             nvgBeginPath(vg);
-            nvgRect(vg, elem.rect.x1-6, elem.rect.y0, 6, font.GetLineHeight());
-            nvgFillPaint(vg, bg);
+            nvgRect(vg, x, elem.rect.y0, w, font.GetLineHeight());
+            nvgFillColor(vg, nvgRGBA(0,255,255,128));
+            nvgFill(vg);
+        }          
+
+        font.DrawString(elem.rect.x0, elem.rect.y0, elem.text.color.r, elem.text.color.g, elem.text.color.b, elem.text.text);
+
+        if(&elem == focus)
+        {
+            int x = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,cursorIndex));
+
+            nvgBeginPath(vg);
+            nvgRect(vg, x, elem.rect.y0, 1, font.GetLineHeight());
+            nvgFillColor(vg, nvgRGBA(255,255,255,192));
             nvgFill(vg);
         }
 
-        // Draw children in back-to-front order
-        for(const auto & child : elem.children)
-        {
-            DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight, background);
-        }
-
-        // Render border effects after all children have been finished
-        switch(elem.style)
-        {
-        case gui::BORDER:
-            // Restore corners of background
-            nvgBeginPath(vg);
-            nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-            nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 5.0f);
-            nvgPathWinding(vg, NVG_HOLE);
-	        nvgFillColor(vg, parentBackground);
-	        nvgFill(vg);
-
-            // Stroke an outline for the box
-	        nvgBeginPath(vg);
-	        nvgRoundedRect(vg, elem.rect.x0+1.5f, elem.rect.y0+1.5f, elem.rect.GetWidth()-3, elem.rect.GetHeight()-3, 4.5f);
-	        nvgStrokeColor(vg, nvgRGBA(0,0,0,192));
-            nvgStrokeWidth(vg, 2);
-	        nvgStroke(vg);
-            break;
-        case gui::EDIT:
-            // Restore corners of background
-            nvgBeginPath(vg);
-            nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-            nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 2);
-            nvgPathWinding(vg, NVG_HOLE);
-	        nvgFillColor(vg, parentBackground);
-	        nvgFill(vg);
-
-            // Stroke an outline for the box
-	        nvgBeginPath(vg);
-	        nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 2.5f);
-	        nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
-            nvgStrokeWidth(vg, 1);
-	        nvgStroke(vg);
-            break;
-        }
-
-        nvgRestore(vg);
+        auto transparentBackground = parentBackground;
+        transparentBackground.a = 0;
+        auto bg = nvgLinearGradient(vg, elem.rect.x1-6, elem.rect.y0, elem.rect.x1, elem.rect.y0, transparentBackground, parentBackground);
+        nvgBeginPath(vg);
+        nvgRect(vg, elem.rect.x1-6, elem.rect.y0, 6, font.GetLineHeight());
+        nvgFillPaint(vg, bg);
+        nvgFill(vg);
     }
+
+    // Draw children in back-to-front order
+    for(const auto & child : elem.children)
+    {
+        DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight, background);
+    }
+
+    // Render border effects after all children have been finished
+    switch(elem.style)
+    {
+    case gui::BORDER:
+        // Restore corners of background
+        nvgBeginPath(vg);
+        nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+        nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 5.0f);
+        nvgPathWinding(vg, NVG_HOLE);
+	    nvgFillColor(vg, parentBackground);
+	    nvgFill(vg);
+
+        // Stroke an outline for the box
+	    nvgBeginPath(vg);
+	    nvgRoundedRect(vg, elem.rect.x0+1.5f, elem.rect.y0+1.5f, elem.rect.GetWidth()-3, elem.rect.GetHeight()-3, 4.5f);
+	    nvgStrokeColor(vg, nvgRGBA(0,0,0,192));
+        nvgStrokeWidth(vg, 2);
+	    nvgStroke(vg);
+        break;
+    case gui::EDIT:
+        // Restore corners of background
+        nvgBeginPath(vg);
+        nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
+        nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 2);
+        nvgPathWinding(vg, NVG_HOLE);
+	    nvgFillColor(vg, parentBackground);
+	    nvgFill(vg);
+
+        // Stroke an outline for the box
+	    nvgBeginPath(vg);
+	    nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 2.5f);
+	    nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
+        nvgStrokeWidth(vg, 1);
+	    nvgStroke(vg);
+        break;
+    }
+
+    nvgRestore(vg);
+
+    elem.OnDrawForeground();
 }
 
 void Window::Redraw()
