@@ -90,6 +90,15 @@ class SplitterBorder : public gui::Element
 public:
     SplitterBorder(gui::Element & panel, const DimensionDesc & dim) : panel(panel), dim(dim) { cursor = dim.cursor; style = gui::BACKGROUND; }
     gui::DraggerPtr OnClick(const int2 & mouse) override { return std::make_shared<Dragger>(panel, dim, mouse); }
+
+    NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override
+    {
+        nvgBeginPath(e.vg);
+        nvgRect(e.vg, rect.x0, rect.y0, rect.GetWidth(), rect.GetHeight());
+	    nvgFillColor(e.vg, nvgRGBA(64,64,64,255));
+	    nvgFill(e.vg);
+        return nvgRGBA(64,64,64,255);
+    }
 };
 
 Splitter::Splitter(gui::ElementPtr panelA, gui::ElementPtr panelB, Side sideB, int pixelsB)
@@ -114,3 +123,43 @@ Splitter::Splitter(gui::ElementPtr panelA, gui::ElementPtr panelB, Side sideB, i
     children.push_back({placeA, panelA});
     children.push_back({placeB, panelB});
 }
+
+////////////
+// Border //
+////////////
+
+Border::Border(int size, float offset, float width, float radius, NVGcolor border, NVGcolor background, gui::ElementPtr inner) :
+    size(size), offset(offset), width(width), radius(radius), border(border), background(background)
+{
+    children.push_back({{{0,size},{0,size},{1,-size},{1,-size}},inner});
+}
+
+NVGcolor Border::OnDrawBackground(const gui::DrawEvent & e) const
+{
+    nvgBeginPath(e.vg);
+    nvgRect(e.vg, rect.x0, rect.y0, rect.GetWidth(), rect.GetHeight());
+	nvgFillColor(e.vg, background);
+	nvgFill(e.vg);
+    return background;
+}
+
+void Border::OnDrawForeground(const gui::DrawEvent & e) const
+{
+    // Restore corners of background
+    nvgBeginPath(e.vg);
+    nvgRect(e.vg, rect.x0, rect.y0, rect.GetWidth(), rect.GetHeight());
+    nvgRoundedRect(e.vg, rect.x0+offset, rect.y0+offset, rect.GetWidth()-offset*2, rect.GetHeight()-offset*2, radius);
+    nvgPathWinding(e.vg, NVG_HOLE);
+	nvgFillColor(e.vg, e.parent);
+	nvgFill(e.vg);
+
+    // Stroke an outline for the box
+	nvgBeginPath(e.vg);
+	nvgRoundedRect(e.vg, rect.x0+offset, rect.y0+offset, rect.GetWidth()-offset*2, rect.GetHeight()-offset*2, radius);
+	nvgStrokeColor(e.vg, border);
+    nvgStrokeWidth(e.vg, width);
+	nvgStroke(e.vg);
+}
+
+std::shared_ptr<Border> Border::CreateBigBorder(gui::ElementPtr inner) { return std::make_shared<Border>(4, 1.5f, 2.0f, 4.5f, nvgRGBA(0,0,0,192), nvgRGBA(64,64,64,255), inner); }
+std::shared_ptr<Border> Border::CreateEditBorder(gui::ElementPtr inner) { return std::make_shared<Border>(1, 0.5f, 1.0f, 2.5f, nvgRGBA(0,0,0,128), nvgRGBA(88,88,88,255), inner); }

@@ -12,14 +12,6 @@ class GuiFactory
 public:
     GuiFactory(const Font & font, int spacing) : font(font), spacing(spacing), editBorder(2) {}
 
-    gui::ElementPtr AddBorder(int pixels, gui::Style style, gui::ElementPtr inner) const
-    {
-        auto panel = std::make_shared<gui::Element>();
-        panel->style = style;
-        panel->children.push_back({{{0,pixels},{0,pixels},{1,-pixels},{1,-pixels}},inner});
-        return panel;
-    }
-
     gui::ElementPtr MakeLabel(const std::string & text) const 
     {
         auto elem = std::make_shared<gui::Element>();
@@ -42,14 +34,7 @@ public:
         return panel;
     }
 
-    gui::ElementPtr MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit={}) const 
-    { 
-        auto elem = std::make_shared<gui::Element>();
-        elem->cursor = gui::Cursor::IBeam;
-        elem->text = {{1,1,1,1}, &font, text, true};
-        elem->onEdit = onEdit;
-        return AddBorder(editBorder, gui::EDIT, elem);
-    }
+    gui::ElementPtr MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit={}) const;
     gui::ElementPtr MakeStringEdit(std::string & value) const
     {
         std::ostringstream ss;
@@ -94,5 +79,29 @@ public:
 
     Splitter(gui::ElementPtr panelA, gui::ElementPtr panelB, Side sideB, int pixelsB);
 };
+
+class Border : public gui::Element
+{
+    int size; // Size of border region in pixels
+    float offset, width, radius; // Placement of stroked border
+    NVGcolor border, background; // Color of border, and internal fill
+public:
+    Border(int size, float offset, float width, float radius, NVGcolor border, NVGcolor background, gui::ElementPtr inner);
+
+    NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
+    void OnDrawForeground(const gui::DrawEvent & e) const override;
+
+    static std::shared_ptr<Border> CreateBigBorder(gui::ElementPtr inner);
+    static std::shared_ptr<Border> CreateEditBorder(gui::ElementPtr inner);
+};
+
+inline gui::ElementPtr GuiFactory::MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit) const 
+{ 
+    auto elem = std::make_shared<gui::Element>();
+    elem->cursor = gui::Cursor::IBeam;
+    elem->text = {{1,1,1,1}, &font, text, true};
+    elem->onEdit = onEdit;
+    return Border::CreateEditBorder(elem);
+}
 
 #endif

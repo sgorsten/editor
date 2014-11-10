@@ -2,6 +2,7 @@
 #define EDITOR_GUI_H
 
 #include "engine/linalg.h"
+#include "nanovg.h"
 
 #include <string>
 #include <vector>
@@ -11,6 +12,8 @@
 class Font;
 
 namespace gl { class Texture; }
+
+struct NVGcontext;
 
 namespace gui
 {
@@ -52,6 +55,16 @@ namespace gui
     struct Child;
 
     enum Style { NONE, BACKGROUND, BORDER, EDIT };
+
+    struct DrawEvent
+    {
+        NVGcontext * vg;    // Current NanoVG context, can be used for drawing
+        NVGcolor parent;    // NanoVG color of parent element, can be used to draw masks/fades over top of current element
+        bool hasFocus;      // True if this was the last element the user clicked on
+        bool isPressed;     // True if the user clicked on this element and has not yet released the mouse
+        bool isMouseOver;   // True if the mouse is presently over this element
+    };
+
     struct Element
     {
         struct TextComponent
@@ -68,11 +81,11 @@ namespace gui
         Rect                                                rect;
         std::vector<Child>                                  children;
 
-        virtual DraggerPtr                                  OnClick(const int2 & mouse) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
         virtual void                                        OnKey(int key, int action, int mods) {}
+        virtual DraggerPtr                                  OnClick(const int2 & mouse) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
 
-        virtual void                                        OnDrawBackground() const {} // Draw contents before children
-        virtual void                                        OnDrawForeground() const {} // Draw contents after children
+        virtual NVGcolor                                    OnDrawBackground(const DrawEvent & e) const { return e.parent; } // Draw contents before children
+        virtual void                                        OnDrawForeground(const DrawEvent & e) const {} // Draw contents after children
 
         std::function<void(const std::string & text)>       onEdit;
         

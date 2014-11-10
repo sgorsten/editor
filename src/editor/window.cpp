@@ -380,41 +380,13 @@ void Window::SetGuiRoot(gui::ElementPtr element)
 
 static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * focus, size_t cursorIndex, size_t selectLeft, size_t selectRight, NVGcolor parentBackground)
 {
-    elem.OnDrawBackground();
+    gui::DrawEvent e = {vg,parentBackground};
+    e.hasFocus = &elem == focus;
 
-    nvgSave(vg);
-
-    // Compute the background color for this element
-    NVGcolor background = parentBackground;
-    if(elem.style != gui::NONE)
-    {
-        int minSize = 0;
-        switch(elem.style)
-        {    
-        case gui::BORDER:
-            minSize = 12;
-        case gui::BACKGROUND:
-            background = nvgRGBA(64,64,64,255);
-            break;
-        case gui::EDIT:
-            background = nvgRGBA(88,88,88,255);
-            minSize = 6;
-            break;
-        }
-
-        // If it differs from the parent element, fill the client area with the new background color
-        if(memcmp(&background, &parentBackground, sizeof(background)))
-        {
-            if((elem.rect.GetWidth() < minSize || elem.rect.GetHeight() < minSize) && parentBackground.a != 0) return;
-            nvgBeginPath(vg);
-            nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-	        nvgFillColor(vg, background);
-	        nvgFill(vg);
-        }
-        if(parentBackground.a == 0) parentBackground = background; // If there was no parent color, reuse this color
-    }
+    NVGcolor background = elem.OnDrawBackground(e);
 
     // Begin scissoring to client rect
+    nvgSave(vg);
 	nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
 
     // If we have an assigned font, handle rendering of text component
@@ -459,47 +431,9 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
     {
         DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight, background);
     }
-
-    // Render border effects after all children have been finished
-    switch(elem.style)
-    {
-    case gui::BORDER:
-        // Restore corners of background
-        nvgBeginPath(vg);
-        nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-        nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 5.0f);
-        nvgPathWinding(vg, NVG_HOLE);
-	    nvgFillColor(vg, parentBackground);
-	    nvgFill(vg);
-
-        // Stroke an outline for the box
-	    nvgBeginPath(vg);
-	    nvgRoundedRect(vg, elem.rect.x0+1.5f, elem.rect.y0+1.5f, elem.rect.GetWidth()-3, elem.rect.GetHeight()-3, 4.5f);
-	    nvgStrokeColor(vg, nvgRGBA(0,0,0,192));
-        nvgStrokeWidth(vg, 2);
-	    nvgStroke(vg);
-        break;
-    case gui::EDIT:
-        // Restore corners of background
-        nvgBeginPath(vg);
-        nvgRect(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-        nvgRoundedRect(vg, elem.rect.x0+1, elem.rect.y0+1, elem.rect.GetWidth()-2, elem.rect.GetHeight()-2, 2);
-        nvgPathWinding(vg, NVG_HOLE);
-	    nvgFillColor(vg, parentBackground);
-	    nvgFill(vg);
-
-        // Stroke an outline for the box
-	    nvgBeginPath(vg);
-	    nvgRoundedRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1, elem.rect.GetHeight()-1, 2.5f);
-	    nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
-        nvgStrokeWidth(vg, 1);
-	    nvgStroke(vg);
-        break;
-    }
-
     nvgRestore(vg);
 
-    elem.OnDrawForeground();
+    elem.OnDrawForeground(e);
 }
 
 void Window::Redraw()

@@ -6,6 +6,8 @@
 #include "engine/transform.h"
 #include "engine/geometry.h"
 
+#include "nanovg.h"
+
 #include <vector>
 #include <algorithm>
 #include <sstream>
@@ -205,7 +207,7 @@ struct View : public gui::Element
         }
     }
 
-    void OnDrawBackground() const override
+    NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override
     {
         glPushAttrib(GL_ALL_ATTRIB_BITS);
         glViewport(rect.x0, rect.y0, rect.x1-rect.x0, rect.y1-rect.y0);
@@ -256,8 +258,19 @@ struct View : public gui::Element
             glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 1.0f, 0.2f, 0.2f);
             selection.arrowMesh.Draw();
         }
-        
+
         glPopAttrib();
+
+        if(e.hasFocus)
+        {
+	        nvgBeginPath(e.vg);
+	        nvgRect(e.vg, rect.x0+1.5f, rect.y0+1.5f, rect.GetWidth()-3, rect.GetHeight()-3);
+	        nvgStrokeColor(e.vg, nvgRGBA(255,255,255,128));
+            nvgStrokeWidth(e.vg, 1);
+	        nvgStroke(e.vg);
+        }
+
+        return {};
     }
 
     gui::DraggerPtr OnClick(const int2 & mouse) override
@@ -391,8 +404,8 @@ void main()
         }
 
         propertyPanel = std::make_shared<gui::Element>();
-        auto topRightPanel = factory.AddBorder(4, gui::BORDER, objectList);
-        auto bottomRightPanel = factory.AddBorder(4, gui::BORDER, propertyPanel);
+        auto topRightPanel = Border::CreateBigBorder(objectList);
+        auto bottomRightPanel = Border::CreateBigBorder(propertyPanel);
         auto rightPanel = std::make_shared<Splitter>(bottomRightPanel, topRightPanel, Splitter::Top, 200);
         guiRoot = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
     
