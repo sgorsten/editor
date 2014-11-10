@@ -87,28 +87,25 @@ public:
     gui::DraggerPtr OnClick(int x, int y) override { return std::make_shared<Dragger>(panel, dim, int2(x,y)); }
 };
 
-gui::ElementPtr GuiFactory::MakeNSSizer(gui::ElementPtr top, gui::ElementPtr bottom, int split)
+Splitter::Splitter(gui::ElementPtr panelA, gui::ElementPtr panelB, Side sideB, int pixelsB)
 {
-    auto panel = std::make_shared<gui::Element>();
-    auto sizer = std::make_shared<SplitterBorder>(*panel, DimensionDesc{&int2::y, &gui::Rect::y0, &gui::Rect::y1, &gui::URect::y0, &gui::URect::y1, gui::Cursor::SizeNS});
-    int height = 4;
-    if(split > 0) panel->children.push_back({{{0,0},{0,split},{1,0},{0,split+height}}, sizer});
-    if(split < 0) panel->children.push_back({{{0,0},{1,split-height},{1,0},{1,split}}, sizer});
-    if(split == 0) panel->children.push_back({{{0,0},{0.5,-height*0.5f},{1,0},{0.5,height*0.5f}}, sizer});
-    panel->children.push_back({{{0,0},{0,0},{1,0},panel->children[0].placement.y0},top});
-    panel->children.push_back({{{0,0},panel->children[0].placement.y1,{1,0},{1,0}},bottom});
-    return panel;
-}
+    const DimensionDesc dimX {&int2::x, &gui::Rect::x0, &gui::Rect::x1, &gui::URect::x0, &gui::URect::x1, gui::Cursor::SizeWE};
+    const DimensionDesc dimY {&int2::y, &gui::Rect::y0, &gui::Rect::y1, &gui::URect::y0, &gui::URect::y1, gui::Cursor::SizeNS};
+    auto dim = sideB == Left || sideB == Right ? dimX : dimY;
+    auto border = std::make_shared<SplitterBorder>(*this, dim);
 
-gui::ElementPtr GuiFactory::MakeWESizer(gui::ElementPtr left, gui::ElementPtr right, int split)
-{
-    auto panel = std::make_shared<gui::Element>();
-    auto sizer = std::make_shared<SplitterBorder>(*panel, DimensionDesc{&int2::x, &gui::Rect::x0, &gui::Rect::x1, &gui::URect::x0, &gui::URect::x1, gui::Cursor::SizeWE});
-    int width = 4;
-    if(split > 0) panel->children.push_back({{{0,split},{0,0},{0,split+width},{1,0}}, sizer});
-    if(split < 0) panel->children.push_back({{{1,split-width},{0,0},{1,split},{1,0}}, sizer});
-    if(split == 0) panel->children.push_back({{{0.5,-width*0.5f},{0,0},{0.5,width*0.5f},{1,0}}, sizer});
-    panel->children.push_back({{{0,0},{0,0},panel->children[0].placement.x0,{1,0}},left});
-    panel->children.push_back({{panel->children[0].placement.x1,{0,0},{1,0},{1,0}},right});
-    return panel;
+    gui::URect placement = {{0,0},{0,0},{1,0},{1,0}}, placeA = placement, placeB = placement;
+    switch(sideB)
+    {
+    case Left: placement.x0 = {0,pixelsB}; placement.x1 = {0,pixelsB+4}; panelA.swap(panelB); break;
+    case Top: placement.y0 = {0,pixelsB}; placement.y1 = {0,pixelsB+4}; panelA.swap(panelB); break;
+    case Right: placement.x0 = {1,-pixelsB-4}; placement.x1 = {1,-pixelsB}; break;
+    case Bottom: placement.y0 = {1,-pixelsB-4}; placement.y1 = {1,-pixelsB}; break;
+    }    
+
+    placeA.*dim.u1 = placement.*dim.u0;
+    placeB.*dim.u0 = placement.*dim.u1;
+    children.push_back({placement, border});
+    children.push_back({placeA, panelA});
+    children.push_back({placeB, panelB});
 }

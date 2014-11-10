@@ -386,8 +386,8 @@ void main()
         propertyPanel = std::make_shared<gui::Element>();
         auto topRightPanel = factory.AddBorder(4, gui::BORDER, objectList);
         auto bottomRightPanel = factory.AddBorder(4, gui::BORDER, propertyPanel);
-        auto rightPanel = factory.MakeNSSizer(topRightPanel, bottomRightPanel, 200);
-        guiRoot = factory.MakeWESizer(view, rightPanel, -400);
+        auto rightPanel = std::make_shared<Splitter>(bottomRightPanel, topRightPanel, Splitter::Top, 200);
+        guiRoot = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
     
         selection.onSelectionChanged = [this]()
         {

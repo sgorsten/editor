@@ -70,9 +70,6 @@ public:
         panel->children.push_back({{{2.0f/3,+spacing*2.0f/3},{0,0},{3.0f/3, 0},{1,0}},MakeFloatEdit(value.z)});
         return panel;
     }
-
-    gui::ElementPtr MakeNSSizer(gui::ElementPtr top, gui::ElementPtr bottom, int split);
-    gui::ElementPtr MakeWESizer(gui::ElementPtr left, gui::ElementPtr right, int split);
 };
 
 class ListBox : public gui::Element
@@ -84,11 +81,18 @@ public:
     int GetSelectedIndex() const { return selectedIndex; }
 
     void SetSelectedIndex(int index);
-
     void SetItemText(int index, const std::string & text);
     void AddItem(const GuiFactory & factory, const std::string & text);
 
     std::function<void()> onSelectionChanged;
+};
+
+class Splitter : public gui::Element
+{
+public:
+    enum Side { Left, Top, Right, Bottom };
+
+    Splitter(gui::ElementPtr panelA, gui::ElementPtr panelB, Side sideB, int pixelsB);
 };
 
 #endif
