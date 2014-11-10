@@ -13,6 +13,7 @@ class Font;
 
 namespace gl { class Texture; }
 
+struct GLFWwindow;
 struct NVGcontext;
 
 namespace gui
@@ -56,6 +57,12 @@ namespace gui
 
     enum Style { NONE, BACKGROUND, BORDER, EDIT };
 
+    struct MouseEvent
+    {
+        int2 cursor;
+        bool shift;
+    };
+
     struct DrawEvent
     {
         NVGcontext * vg;    // Current NanoVG context, can be used for drawing
@@ -81,8 +88,9 @@ namespace gui
         Rect                                                rect;
         std::vector<Child>                                  children;
 
-        virtual void                                        OnKey(int key, int action, int mods) {}
-        virtual DraggerPtr                                  OnClick(const int2 & mouse) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
+        virtual void                                        OnChar(uint32_t codepoint) {}
+        virtual void                                        OnKey(GLFWwindow * window, int key, int action, int mods) {}
+        virtual DraggerPtr                                  OnClick(const MouseEvent & e) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
 
         virtual NVGcolor                                    OnDrawBackground(const DrawEvent & e) const { return e.parent; } // Draw contents before children
         virtual void                                        OnDrawForeground(const DrawEvent & e) const {} // Draw contents after children

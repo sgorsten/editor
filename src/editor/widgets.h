@@ -4,6 +4,7 @@
 #include "gui.h"
 #include "engine/font.h"
 #include <sstream>
+#include <algorithm>
 
 class GuiFactory
 {
@@ -12,12 +13,7 @@ class GuiFactory
 public:
     GuiFactory(const Font & font, int spacing) : font(font), spacing(spacing), editBorder(2) {}
 
-    gui::ElementPtr MakeLabel(const std::string & text) const 
-    {
-        auto elem = std::make_shared<gui::Element>();
-        elem->text = {{1,1,1,1},&font,text,false};
-        return elem;
-    }
+    gui::ElementPtr MakeLabel(const std::string & text) const;
     gui::ElementPtr MakePropertyMap(std::vector<std::pair<std::string, gui::ElementPtr>> properties) const
     {
         int y0 = 0;
@@ -55,6 +51,33 @@ public:
         panel->children.push_back({{{2.0f/3,+spacing*2.0f/3},{0,0},{3.0f/3, 0},{1,0}},MakeFloatEdit(value.z)});
         return panel;
     }
+};
+
+class Text : public gui::Element
+{
+    size_t cursor, mark;
+    bool isSelecting;
+
+    const char * GetFocusText() const { return text.text.data(); }
+    size_t GetFocusTextSize() const { return text.text.size(); }   
+public:
+    Text() : cursor(), mark(), isSelecting() {}
+
+    size_t GetSelectionLeftIndex() const { return std::min(cursor, mark); }
+    size_t GetSelectionRightIndex() const { return std::max(cursor, mark); }
+    std::string GetSelectionText() const { return std::string(text.text.c_str() + GetSelectionLeftIndex(), text.text.c_str() + GetSelectionRightIndex()); }
+
+    void SelectAll();
+    void MoveSelectionCursor(int newCursor, bool holdingShift);
+    void RemoveSelection();
+    void Insert(const char * string);
+
+    void OnChar(uint32_t codepoint) override;
+    void OnKey(GLFWwindow * window, int key, int action, int mods) override;
+    gui::DraggerPtr OnClick(const gui::MouseEvent & e) override;
+    NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
+
+    std::function<void(const std::string &)> onEdit;
 };
 
 class ListBox : public gui::Element
@@ -95,10 +118,17 @@ public:
     static std::shared_ptr<Border> CreateEditBorder(gui::ElementPtr inner);
 };
 
+inline gui::ElementPtr GuiFactory::MakeLabel(const std::string & text) const 
+{
+    auto elem = std::make_shared<Text>();
+    elem->text = {{1,1,1,1},&font,text,false};
+    return elem;
+}
+
 inline gui::ElementPtr GuiFactory::MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit) const 
 { 
-    auto elem = std::make_shared<gui::Element>();
-    elem->cursor = gui::Cursor::IBeam;
+    auto elem = std::make_shared<Text>();
+    //elem->cursor = gui::Cursor::IBeam;
     elem->text = {{1,1,1,1}, &font, text, true};
     elem->onEdit = onEdit;
     return Border::CreateEditBorder(elem);

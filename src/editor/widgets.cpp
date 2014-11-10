@@ -1,18 +1,220 @@
 #include "widgets.h"
+#include "engine/utf8.h"
 
 #include <algorithm>
+
+////////////////
+// class Text //
+////////////////
+
+void Text::SelectAll()
+{
+    isSelecting = true;
+    mark = 0;
+    cursor = text.text.size();
+}
+
+void Text::MoveSelectionCursor(int newCursor, bool holdingShift)
+{
+    if(holdingShift)
+    {
+        if(!isSelecting)
+        {
+            mark = cursor;
+            isSelecting = true;
+        }
+    }
+    else isSelecting = false;
+    cursor = newCursor;
+}
+
+void Text::RemoveSelection()
+{
+    if(!isSelecting || !text.isEditable) return;
+    auto left = GetSelectionLeftIndex(), right = GetSelectionRightIndex();
+    text.text.erase(left, right-left);
+    cursor = left;
+    isSelecting = false;
+    if(onEdit) onEdit(text.text);
+}
+
+void Text::Insert(const char * string)
+{
+    if(!text.isEditable) return;
+    text.text.insert(cursor, string);
+    cursor += strlen(string);
+    if(onEdit) onEdit(text.text);
+}
+
+void Text::OnChar(uint32_t codepoint)
+{
+    if(isSelecting) RemoveSelection();
+    Insert(utf8::units(codepoint).data());
+}
+
+void Text::OnKey(GLFWwindow * window, int key, int action, int mods)
+{
+    // Text elements only respond to key presses, not releases
+    if(action == GLFW_RELEASE) return;
+
+    if(mods & GLFW_MOD_CONTROL && key == GLFW_KEY_A)
+    {
+        SelectAll();
+        return;
+    }
+
+    if(mods & GLFW_MOD_CONTROL && key == GLFW_KEY_C)
+    {
+        if(isSelecting)
+        {
+            auto ct = GetSelectionText();
+            glfwSetClipboardString(window, ct.c_str());
+        }
+        return;
+    }
+
+    // All subsequent commands apply only to editable text elements
+    if(!text.isEditable) return;
+    
+    if(mods & GLFW_MOD_CONTROL && key == GLFW_KEY_X)
+    {
+        if(isSelecting)
+        {
+            auto ct = GetSelectionText();
+            glfwSetClipboardString(window, ct.c_str());
+            RemoveSelection();
+        }
+        return;
+    }
+
+    if(mods & GLFW_MOD_CONTROL && key == GLFW_KEY_V)
+    {
+        if(auto ct = glfwGetClipboardString(window))
+        {
+            RemoveSelection();
+            Insert(ct);
+        }
+        return;
+    }
+                    
+    switch(key)
+    {
+    case GLFW_KEY_LEFT:
+        if(cursor > 0) MoveSelectionCursor(utf8::prev(GetFocusText() + cursor) - GetFocusText(), (mods & GLFW_MOD_SHIFT) != 0);
+        break;
+    case GLFW_KEY_RIGHT: 
+        if(cursor < GetFocusTextSize()) MoveSelectionCursor(cursor = utf8::next(GetFocusText() + cursor) - GetFocusText(), (mods & GLFW_MOD_SHIFT) != 0);
+        break;
+    case GLFW_KEY_HOME:
+        if(cursor > 0) MoveSelectionCursor(0, (mods & GLFW_MOD_SHIFT) != 0);
+        break;
+    case GLFW_KEY_END: 
+        if(cursor < GetFocusTextSize()) MoveSelectionCursor(GetFocusTextSize(), (mods & GLFW_MOD_SHIFT) != 0);
+        break;
+    case GLFW_KEY_BACKSPACE: 
+        if(isSelecting) RemoveSelection();
+        else if(text.isEditable && cursor > 0)
+        {
+            int prev = utf8::prev(GetFocusText() + cursor) - GetFocusText();
+            text.text.erase(prev, cursor - prev);
+            cursor = prev;
+            if(onEdit) onEdit(text.text);
+        }
+        break;
+    case GLFW_KEY_DELETE:
+        if(isSelecting) RemoveSelection();
+        else if(text.isEditable && cursor < GetFocusTextSize())
+        {
+            auto next = utf8::next(GetFocusText() + cursor) - GetFocusText();
+            text.text.erase(cursor, next - cursor);
+            if(onEdit) onEdit(text.text);
+        }
+        break;
+    }
+}
+
+class TextDragger : public gui::IDragger
+{
+    Text & text;
+public:
+    TextDragger(Text & text) : text(text) {}
+
+    void OnDrag(int2 newMouse) override
+    {
+        if(text.text.font)
+        {
+            text.MoveSelectionCursor(text.text.font->GetUnitIndex(text.text.text, newMouse.x - text.rect.x0), true);
+        }
+    }
+    void OnRelease() override {}
+    void OnCancel() override {}
+};
+
+gui::DraggerPtr Text::OnClick(const gui::MouseEvent & e)
+{
+    isSelecting = false;
+    if(text.font) MoveSelectionCursor(text.font->GetUnitIndex(text.text, e.cursor.x - rect.x0), e.shift);
+    return std::make_shared<TextDragger>(*this);
+}
+
+NVGcolor Text::OnDrawBackground(const gui::DrawEvent & e) const
+{
+    // Skip drawing if no font has been assigned
+    if(!text.font) return e.parent;
+    const auto & font = *text.font;
+
+    // Draw selection if we are selecting
+    if(e.hasFocus && isSelecting)
+    {
+        const int x = rect.x0 + font.GetStringWidth(text.text.substr(0,GetSelectionLeftIndex()));
+        const int w = font.GetStringWidth(text.text.substr(GetSelectionLeftIndex(),GetSelectionRightIndex()-GetSelectionLeftIndex()));
+
+        nvgBeginPath(e.vg);
+        nvgRect(e.vg, x, rect.y0, w, font.GetLineHeight());
+        nvgFillColor(e.vg, nvgRGBA(0,255,255,128));
+        nvgFill(e.vg);
+    }          
+
+    // Draw the text itself
+    font.DrawString(rect.x0, rect.y0, text.color.r, text.color.g, text.color.b, text.text);
+
+    // Draw cursor if we have focus
+    if(e.hasFocus)
+    {
+        int x = rect.x0 + font.GetStringWidth(text.text.substr(0,cursor));
+
+        nvgBeginPath(e.vg);
+        nvgRect(e.vg, x, rect.y0, 1, font.GetLineHeight());
+        nvgFillColor(e.vg, nvgRGBA(255,255,255,192));
+        nvgFill(e.vg);
+    }
+
+    // Fade text to the right
+    auto transparentBackground = e.parent;
+    transparentBackground.a = 0;
+    auto bg = nvgLinearGradient(e.vg, rect.x1-6, rect.y0, rect.x1, rect.y0, transparentBackground, e.parent);
+    nvgBeginPath(e.vg);
+    nvgRect(e.vg, rect.x1-6, rect.y0, 6, font.GetLineHeight());
+    nvgFillPaint(e.vg, bg);
+    nvgFill(e.vg);
+    return e.parent;
+}
 
 ///////////////////
 // class ListBox //
 ///////////////////
 
-class ListBoxItem : public gui::Element
+class ListBoxItem : public Text
 {
     ListBox & list;
     int index;
 public:
     ListBoxItem(ListBox & list, int index) : list(list), index(index) {}
-    gui::DraggerPtr OnClick(const int2 &) override { list.SetSelectedIndex(index); return {}; };
+    gui::DraggerPtr OnClick(const gui::MouseEvent & e) override
+    {
+        list.SetSelectedIndex(index);
+        return Text::OnClick(e);
+    };
 };
 
 void ListBox::SetSelectedIndex(int index)
@@ -89,7 +291,7 @@ class SplitterBorder : public gui::Element
     DimensionDesc dim;
 public:
     SplitterBorder(gui::Element & panel, const DimensionDesc & dim) : panel(panel), dim(dim) { cursor = dim.cursor; style = gui::BACKGROUND; }
-    gui::DraggerPtr OnClick(const int2 & mouse) override { return std::make_shared<Dragger>(panel, dim, mouse); }
+    gui::DraggerPtr OnClick(const gui::MouseEvent & e) override { return std::make_shared<Dragger>(panel, dim, e.cursor); }
 
     NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override
     {

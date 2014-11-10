@@ -23,59 +23,26 @@ gui::ElementPtr GetElement(const gui::ElementPtr & element, int x, int y)
     return nullptr;
 }
 
-void Window::OnClick(gui::ElementPtr clickfocus, int mouseX, int mouseY, bool holdingShift)
+void Window::OnClick(gui::ElementPtr clickFocus, int mouseX, int mouseY, bool holdingShift)
 {
-    dragger = nullptr;
-    if(clickfocus != focus)
+    if(dragger)
     {
-        focus = clickfocus;
-        isSelecting = false;
+        dragger->OnRelease();
+        dragger = nullptr;
     }
-    if(focus && focus->text.font) MoveSelectionCursor(focus->text.font->GetUnitIndex(focus->text.text, mouseX - focus->rect.x0), holdingShift);
-    if(focus) dragger = focus->OnClick({mouseX, mouseY});
-}
-
-void Window::MoveSelectionCursor(int newCursor, bool holdingShift)
-{
-    if(holdingShift)
+    
+    if(focus != clickFocus)
     {
-        if(!isSelecting)
-        {
-            mark = cursor;
-            isSelecting = true;
-        }
+        focus = clickFocus;
+    }    
+
+    if(focus)
+    {
+        dragger = focus->OnClick({{mouseX, mouseY}, holdingShift});
     }
-    else isSelecting = false;
-    cursor = newCursor;
 }
 
-void Window::SelectAll()
-{
-    if(!focus) return;
-    isSelecting = true;
-    mark = 0;
-    cursor = GetFocusTextSize();
-}
-
-void Window::RemoveSelection()
-{
-    if(!isSelecting || !focus || !focus->text.isEditable) return;
-    auto left = GetSelectionLeftIndex(), right = GetSelectionRightIndex();
-    focus->text.text.erase(left, right-left);
-    cursor = left;
-    isSelecting = false;
-    OnEdit();
-}
-
-void Window::Insert(const char * text)
-{
-    if(!focus->text.isEditable) return;
-    focus->text.text.insert(cursor, text);
-    cursor += strlen(text);
-    OnEdit();
-}
-
-Window::Window(const char * title, int width, int height) : window(), width(width), height(height), focus(), isSelecting(), vg()
+Window::Window(const char * title, int width, int height) : window(), width(width), height(height), focus(), vg()
 {
     glfwWindowHint(GLFW_STENCIL_BITS, 8);
     window = glfwCreateWindow(width, height, title, nullptr, nullptr);
@@ -183,11 +150,7 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
     glfwSetCharCallback(window, [](GLFWwindow * window, unsigned int codepoint)
     {
         auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
-        if(w->focus)
-        {
-            if(w->isSelecting) w->RemoveSelection();
-            w->Insert(utf8::units(codepoint).data());
-        }
+        if(w->focus) w->focus->OnChar(codepoint);
     });
 
     glfwSetMouseButtonCallback(window, [](GLFWwindow * window, int button, int action, int mods)
@@ -218,16 +181,6 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
         int x = static_cast<int>(cx), y = static_cast<int>(cy);
         auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
         if(w->dragger) w->dragger->OnDrag(int2(cx,cy));
-        else if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
-        {
-            if(w->focus)
-            {
-                if(w->focus->text.font)
-                {
-                    w->MoveSelectionCursor(w->focus->text.font->GetUnitIndex(w->focus->text.text, x - w->focus->rect.x0), true);
-                }
-            }
-        }
         else
         {
             auto elem = GetElement(w->root, x, y);
@@ -259,7 +212,7 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
                 else
                 {
                     w->OnClick(*focusIt, 0, 0, false);
-                    w->SelectAll();
+                    //w->SelectAll();
                 }
             }
             if(!w->focus)
@@ -267,87 +220,14 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
                 if(!w->tabStops.empty())
                 {
                     w->OnClick(w->tabStops.front(), 0, 0, false);
-                    w->SelectAll();
+                    //w->SelectAll();
                 }
             }
             return;
         }
 
         // All remaining keys apply to current "focus" element
-        if(!w->focus) return;
-
-        // If element is editable, keypressed apply to text editing behavior only
-        if(w->focus->text.isEditable)
-        {
-            if(action == GLFW_RELEASE) return;
-            if(mods & GLFW_MOD_CONTROL) switch(key)
-            {
-            case GLFW_KEY_A:
-                w->SelectAll();
-                break;
-            case GLFW_KEY_X:
-                if(w->isSelecting)
-                {
-                    auto ct = w->GetSelectionText();
-                    glfwSetClipboardString(window, ct.c_str());
-                    w->RemoveSelection();
-                }
-                break;
-            case GLFW_KEY_C:
-                if(w->isSelecting)
-                {
-                    auto ct = w->GetSelectionText();
-                    glfwSetClipboardString(window, ct.c_str());
-                }
-                break;               
-            case GLFW_KEY_V:
-                if(auto ct = glfwGetClipboardString(window))
-                {
-                    w->RemoveSelection();
-                    w->Insert(ct);
-                }
-                break;
-            }
-                    
-            switch(key)
-            {
-            case GLFW_KEY_LEFT:
-                if(w->cursor > 0) w->MoveSelectionCursor(utf8::prev(w->GetFocusText() + w->cursor) - w->GetFocusText(), (mods & GLFW_MOD_SHIFT) != 0);
-                break;
-            case GLFW_KEY_RIGHT: 
-                if(w->cursor < w->GetFocusTextSize()) w->MoveSelectionCursor(w->cursor = utf8::next(w->GetFocusText() + w->cursor) - w->GetFocusText(), (mods & GLFW_MOD_SHIFT) != 0);
-                break;
-            case GLFW_KEY_HOME:
-                if(w->cursor > 0) w->MoveSelectionCursor(0, (mods & GLFW_MOD_SHIFT) != 0);
-                break;
-            case GLFW_KEY_END: 
-                if(w->cursor < w->GetFocusTextSize()) w->MoveSelectionCursor(w->GetFocusTextSize(), (mods & GLFW_MOD_SHIFT) != 0);
-                break;
-            case GLFW_KEY_BACKSPACE: 
-                if(w->isSelecting) w->RemoveSelection();
-                else if(w->focus->text.isEditable && w->cursor > 0)
-                {
-                    int prev = utf8::prev(w->GetFocusText() + w->cursor) - w->GetFocusText();
-                    w->focus->text.text.erase(prev, w->cursor - prev);
-                    w->cursor = prev;
-                    w->OnEdit();
-                }
-                break;
-            case GLFW_KEY_DELETE:
-                if(w->isSelecting) w->RemoveSelection();
-                else if(w->focus->text.isEditable && w->cursor < w->GetFocusTextSize())
-                {
-                    auto next = utf8::next(w->GetFocusText() + w->cursor) - w->GetFocusText();
-                    w->focus->text.text.erase(w->cursor, next - w->cursor);
-                    w->OnEdit();
-                }
-                break;
-            }
-            return;
-        }
-            
-        // Finally, dispatch to custom key handler if one is present
-        w->focus->OnKey(key, action, mods);
+        if(w->focus) w->focus->OnKey(window, key, action, mods);
     });
 }
 
@@ -378,62 +258,17 @@ void Window::SetGuiRoot(gui::ElementPtr element)
     RefreshLayout();
 }
 
-static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * focus, size_t cursorIndex, size_t selectLeft, size_t selectRight, NVGcolor parentBackground)
+static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * focus, NVGcolor parentBackground)
 {
     gui::DrawEvent e = {vg,parentBackground};
     e.hasFocus = &elem == focus;
 
-    NVGcolor background = elem.OnDrawBackground(e);
-
-    // Begin scissoring to client rect
     nvgSave(vg);
 	nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
-
-    // If we have an assigned font, handle rendering of text component
-    if(elem.text.font)
-    {
-        const auto & font = *elem.text.font;
-
-        if(&elem == focus && selectLeft < selectRight)
-        {
-            const int x = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,selectLeft));
-            const int w = font.GetStringWidth(elem.text.text.substr(selectLeft,selectRight-selectLeft));
-
-            nvgBeginPath(vg);
-            nvgRect(vg, x, elem.rect.y0, w, font.GetLineHeight());
-            nvgFillColor(vg, nvgRGBA(0,255,255,128));
-            nvgFill(vg);
-        }          
-
-        font.DrawString(elem.rect.x0, elem.rect.y0, elem.text.color.r, elem.text.color.g, elem.text.color.b, elem.text.text);
-
-        if(&elem == focus)
-        {
-            int x = elem.rect.x0 + font.GetStringWidth(elem.text.text.substr(0,cursorIndex));
-
-            nvgBeginPath(vg);
-            nvgRect(vg, x, elem.rect.y0, 1, font.GetLineHeight());
-            nvgFillColor(vg, nvgRGBA(255,255,255,192));
-            nvgFill(vg);
-        }
-
-        auto transparentBackground = parentBackground;
-        transparentBackground.a = 0;
-        auto bg = nvgLinearGradient(vg, elem.rect.x1-6, elem.rect.y0, elem.rect.x1, elem.rect.y0, transparentBackground, parentBackground);
-        nvgBeginPath(vg);
-        nvgRect(vg, elem.rect.x1-6, elem.rect.y0, 6, font.GetLineHeight());
-        nvgFillPaint(vg, bg);
-        nvgFill(vg);
-    }
-
-    // Draw children in back-to-front order
-    for(const auto & child : elem.children)
-    {
-        DrawElement(vg, *child.element, focus, cursorIndex, selectLeft, selectRight, background);
-    }
-    nvgRestore(vg);
-
+    NVGcolor background = elem.OnDrawBackground(e);
+    for(const auto & child : elem.children) DrawElement(vg, *child.element, focus, background);
     elem.OnDrawForeground(e);
+    nvgRestore(vg);
 }
 
 void Window::Redraw()
@@ -456,7 +291,7 @@ void Window::Redraw()
 
     nvgBeginFrame(vg, width, height, 1.0f);
 
-    DrawElement(vg, *root, focus.get(), cursor, isSelecting ? GetSelectionLeftIndex() : 0, isSelecting ? GetSelectionRightIndex() : 0, nvgRGBA(0,0,0,0));
+    DrawElement(vg, *root, focus.get(), nvgRGBA(0,0,0,0));
     nvgEndFrame(vg);
 
     glPopMatrix();

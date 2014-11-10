@@ -24,24 +24,11 @@ class Window
     // Text manipulation logic
     gui::ElementPtr focus;
     gui::DraggerPtr dragger;
-    size_t cursor, mark;
-    bool isSelecting;
     int lastX, lastY;
 
     // Rendering helpers
     NVGcontext * vg;
 
-    const char * GetFocusText() const { return focus ? focus->text.text.data() : nullptr; }
-    size_t GetFocusTextSize() const { return focus ? focus->text.text.size() : 0; }   
-    size_t GetSelectionLeftIndex() const { return std::min(cursor, mark); }
-    size_t GetSelectionRightIndex() const { return std::max(cursor, mark); }
-    std::string GetSelectionText() const { return std::string(GetFocusText() + GetSelectionLeftIndex(), GetFocusText() + GetSelectionRightIndex()); }
-
-    void OnEdit() { if(focus->onEdit) focus->onEdit(focus->text.text); }
-    void RemoveSelection();
-    void Insert(const char * text);
-    void MoveSelectionCursor(int newCursor, bool holdingShift);
-    void SelectAll();
     void OnClick(gui::ElementPtr clickfocus, int mouseX, int mouseY, bool holdingShift);
 public:
     Window(const char * title, int width, int height);
