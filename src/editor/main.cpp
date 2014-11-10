@@ -302,7 +302,7 @@ class Editor
     Window                  window;      
     Font                    font;
     GuiFactory              factory;
-    ListControl             objectList;
+    std::shared_ptr<ListBox>objectList;
     gui::ElementPtr         propertyPanel;
     gui::ElementPtr         guiRoot;
     Mesh                    mesh,ground,bulb;
@@ -377,20 +377,21 @@ void main()
         };
         view->viewpoint.position = {0,1,4};
 
+        objectList = std::make_shared<ListBox>();
         for(auto & obj : scene.objects)
         {
-            objectList.AddItem(factory, obj.name);
+            objectList->AddItem(factory, obj.name);
         }
 
         propertyPanel = std::make_shared<gui::Element>();
-        auto topRightPanel = factory.AddBorder(4, gui::BORDER, objectList.GetPanel());
+        auto topRightPanel = factory.AddBorder(4, gui::BORDER, objectList);
         auto bottomRightPanel = factory.AddBorder(4, gui::BORDER, propertyPanel);
         auto rightPanel = factory.MakeNSSizer(topRightPanel, bottomRightPanel, 200);
         guiRoot = factory.MakeWESizer(view, rightPanel, -400);
     
         selection.onSelectionChanged = [this]()
         {
-            objectList.SetSelectedIndex(selection.object ? selection.object - scene.objects.data() : -1);
+            objectList->SetSelectedIndex(selection.object ? selection.object - scene.objects.data() : -1);
 
             std::vector<std::pair<std::string, gui::ElementPtr>> props;
             if(selection.object)
@@ -398,9 +399,9 @@ void main()
                 auto & obj = *selection.object;
                 props.push_back({"Name", factory.MakeEdit(obj.name, [this](const std::string & text)
                 {
-                    int selectedIndex = objectList.GetSelectedIndex();
+                    int selectedIndex = objectList->GetSelectedIndex();
                     scene.objects[selectedIndex].name = text;
-                    objectList.GetPanel()->children[selectedIndex].element->text.text = text;                
+                    objectList->SetItemText(selectedIndex, text);
                 })});
                 props.push_back({"Position", factory.MakeVectorEdit(obj.position)});
                 props.push_back({"Color", factory.MakeVectorEdit(obj.color)});
@@ -409,7 +410,7 @@ void main()
 
             window.RefreshLayout();
         };
-        objectList.onSelectionChanged = [this]() { selection.SetSelection(&scene.objects[objectList.GetSelectedIndex()]); };
+        objectList->onSelectionChanged = [this]() { selection.SetSelection(&scene.objects[objectList->GetSelectedIndex()]); };
 
         selection.onSelectionChanged();
 
