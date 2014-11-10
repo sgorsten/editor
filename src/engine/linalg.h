@@ -26,6 +26,7 @@ template<class T> struct vec<T,3>
     T &                     operator [] (int i)                 { return (&x)[i]; } // v[i] retrieves the i'th row
     const T &               operator [] (int i) const           { return (&x)[i]; } // v[i] retrieves the i'th row 
     bool                    operator == (const vec & r) const   { return x == r.x && y == r.y && z == r.z; }
+    const vec<T,2> &        xy() const                          { return reinterpret_cast<const vec<T,2> &>(x); }
     template<class F> vec   apply(const vec & r, F f) const     { return {f(x,r.x), f(y,r.y), f(z,r.z)}; }
     template<class F> vec   apply(T r, F f) const               { return {f(x,r), f(y,r), f(z,r)}; }
 };
@@ -40,6 +41,7 @@ template<class T> struct vec<T,4>
     T &                     operator [] (int i)                 { return (&x)[i]; } // v[i] retrieves the i'th row
     const T &               operator [] (int i) const           { return (&x)[i]; } // v[i] retrieves the i'th row 
     bool                    operator == (const vec & r) const   { return x == r.x && y == r.y && z == r.z && w == r.w; }
+    const vec<T,2> &        xy() const                          { return reinterpret_cast<const vec<T,2> &>(x); }
     const vec<T,3> &        xyz() const                         { return reinterpret_cast<const vec<T,3> &>(x); }
     template<class F> vec   apply(const vec & r, F f) const     { return {f(x,r.x), f(y,r.y), f(z,r.z), f(w,r.w)}; }
     template<class F> vec   apply(T r, F f) const               { return {f(x,r), f(y,r), f(z,r), f(w,r)}; }

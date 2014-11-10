@@ -117,15 +117,60 @@ struct Selection
     std::function<void()> onSelectionChanged;
 };
 
+class Raycaster
+{
+    gui::Rect rect;
+    float4x4 invProj;
+    Pose viewpoint;
+public:
+    Raycaster(const gui::Rect & rect, const float4x4 & proj, const Pose & viewpoint) : rect(rect), invProj(inv(proj)), viewpoint(viewpoint) {}
+
+    Ray ComputeRay(int x, int y) const
+    {
+        auto viewX = (x - rect.x0) * 2.0f / rect.GetWidth() - 1;
+        auto viewY = 1 - (y - rect.y0) * 2.0f / rect.GetHeight();
+        return viewpoint * Ray::Between(TransformCoordinate(invProj, {viewX, viewY, -1}), TransformCoordinate(invProj, {viewX, viewY, 1}));
+    }
+};
+
+#include <iostream>
+
 class LinearTranslationDragger : public gui::IDragger
 {
     Object & object;
+    Raycaster caster;
     float3 direction, initialPosition;
-    int2 click;
+    float initialS;
 public:
-    LinearTranslationDragger(Object & object, const float3 & direction, const int2 & click) : object(object), direction(direction), initialPosition(object.position), click(click) {}
+    LinearTranslationDragger(Object & object, const Raycaster & caster, const float3 & direction, const int2 & click) : object(object), caster(caster), direction(direction), initialPosition(object.position) 
+    {
+        Ray ray1 = {initialPosition, direction}, ray2 = caster.ComputeRay(click.x, click.y);
 
-    void OnDrag(int2 newMouse) { object.position = initialPosition + direction * ((newMouse.y - click.y)*0.01f); }
+        auto r12 = ray2.start - ray1.start;
+        auto e1e2 = dot(ray1.direction, ray2.direction);
+        auto denom = 1 - e1e2*e1e2;
+        auto r12e1 = dot(r12,ray1.direction), r12e2 = dot(r12,ray2.direction);
+        auto s = (r12e1 - r12e2*e1e2) / denom;
+
+        initialS = s;
+    }
+
+    void OnDrag(int2 newMouse)
+    { 
+        Ray ray1 = {initialPosition, direction}, ray2 = caster.ComputeRay(newMouse.x, newMouse.y);
+
+        auto r12 = ray2.start - ray1.start;
+        auto e1e2 = dot(ray1.direction, ray2.direction);
+        auto denom = 1 - e1e2*e1e2;
+        auto r12e1 = dot(r12,ray1.direction), r12e2 = dot(r12,ray2.direction);
+        auto s = (r12e1 - r12e2*e1e2) / denom;
+
+        auto newS = s;
+
+        auto amt = newS - initialS;
+
+        object.position = initialPosition + direction * amt;
+    }
     void OnRelease() {}
     void OnCancel() { object.position = initialPosition; }
 };
@@ -230,27 +275,23 @@ struct View : public gui::Element
 
     gui::DraggerPtr OnClick(int x, int y)
     {
-        auto viewX = (x - rect.x0) * 2.0f / rect.GetWidth() - 1;
-        auto viewY = 1 - (y - rect.y0) * 2.0f / rect.GetHeight();
-
-        auto mat = inv(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f));
-        auto p0 = mul(mat, float4(viewX, viewY, -1, 1)), p1 = mul(mat, float4(viewX, viewY, 1, 1));
-        Ray ray = viewpoint * Ray::Between(p0.xyz()/p0.w, p1.xyz()/p1.w);
+        Raycaster caster(rect, PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f), viewpoint);
+        Ray ray = caster.ComputeRay(x,y);
             
         if(selection.object)
         {
             auto localRay = ray;
             localRay.start -= selection.object->position;
             auto hit = selection.arrowMesh.Hit(localRay);
-            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, float3(0,0,1), int2(x,y));
+            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,0,1), int2(x,y));
 
             localRay = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Inverse() * ray;
             hit = selection.arrowMesh.Hit(localRay);
-            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, float3(0,1,0), int2(x,y));
+            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,1,0), int2(x,y));
 
             localRay = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Inverse() * ray;
             hit = selection.arrowMesh.Hit(localRay);
-            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, float3(1,0,0), int2(x,y));
+            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(1,0,0), int2(x,y));
         }
 
         if(auto obj = scene.Hit(ray)) selection.SetSelection(obj);
