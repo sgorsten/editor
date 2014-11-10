@@ -1,4 +1,6 @@
 Overview
 ========
 
-This project consists of some very early explorations into a 3D scene editor, of the sort that might be used to author video game levels, etc. Currently, we have a more-or-less working text entry widget, and the ability to compose cleanly resizeable GUIs using it. Our example program simply allows the user to move a square around the screen by inputting data into a property map.
+This project consists of some very early explorations into a 3D scene editor, of the sort that might be used to author video game levels, etc.
+
+Our example program shows a view into a 3D scene, with the ability to select objects either by clicking or by picking them from an object list, and with the ability to modify some properties either via a gizmo or through a property editor.
