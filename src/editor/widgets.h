@@ -72,13 +72,27 @@ class ListBox : public gui::Element
 public:
     ListBox(const Font & font, int spacing) : font(font), spacing(spacing), selectedIndex(-1) {}
 
-    int GetSelectedIndex() const { return selectedIndex; }
+    int GetSelectedIndex() const { return selectedIndex; }  
 
     void SetSelectedIndex(int index);
     void SetItemText(int index, const std::string & text);
     void AddItem(const std::string & text);
 
     std::function<void()> onSelectionChanged;
+};
+
+class MenuButton : public gui::Element
+{
+public:
+    MenuButton(const Font & font, const std::string & label);
+
+    NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
+    gui::DraggerPtr OnClick(const gui::MouseEvent & e) override;
+};
+
+class MenuBar : public gui::Element
+{
+    NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
 };
 
 class GuiFactory

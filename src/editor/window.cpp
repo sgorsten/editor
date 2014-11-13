@@ -7,6 +7,8 @@
 
 gui::ElementPtr GetElement(const gui::ElementPtr & element, int x, int y)
 {
+    if(element->isTransparent) return nullptr;
+
     for(auto it = element->children.rbegin(), end = element->children.rend(); it != end; ++it)
     {
         if(auto elem = GetElement(it->element, x, y))
@@ -21,21 +23,6 @@ gui::ElementPtr GetElement(const gui::ElementPtr & element, int x, int y)
     }
 
     return nullptr;
-}
-
-void Window::OnClick(gui::ElementPtr clickFocus, int mouseX, int mouseY, bool holdingShift)
-{
-    CancelDrag();
-    
-    if(focus != clickFocus)
-    {
-        focus = clickFocus;
-    }    
-
-    if(focus)
-    {
-        dragger = focus->OnClick({{mouseX, mouseY}, holdingShift});
-    }
 }
 
 void Window::CancelDrag()
@@ -168,16 +155,16 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
 
     glfwSetMouseButtonCallback(window, [](GLFWwindow * window, int button, int action, int mods)
     {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+
         auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
         if(action == GLFW_PRESS)
         {
-            double cx, cy;
-            glfwGetCursorPos(window, &cx, &cy);
-            if(auto elem = GetElement(w->root, cx, cy))
-            {
-                w->OnClick(elem, cx, cy, (mods & GLFW_MOD_SHIFT) != 0);
-            }
-            else w->OnClick(nullptr, 0, 0, false);
+            w->CancelDrag();
+
+            w->focus = w->mouseover;
+            if(w->focus) w->dragger = w->focus->OnClick({{(int)xpos, (int)ypos}, button, mods});
         }
         if(action == GLFW_RELEASE)
         {
@@ -186,6 +173,9 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
                 w->dragger->OnRelease();
                 w->dragger.reset();
             }
+
+            w->mouseover = GetElement(w->root, (int)xpos, (int)ypos);
+            glfwSetCursor(window, w->cursors[(int)(w->mouseover ? w->mouseover->GetCursor() : gui::Cursor::Arrow)]);
         }
     });
 
@@ -196,8 +186,8 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
         if(w->dragger) w->dragger->OnDrag(int2(cx,cy));
         else
         {
-            auto elem = GetElement(w->root, x, y);
-            glfwSetCursor(window, w->cursors[(int)elem->GetCursor()]);
+            w->mouseover = GetElement(w->root, x, y);
+            glfwSetCursor(window, w->cursors[(int)(w->mouseover ? w->mouseover->GetCursor() : gui::Cursor::Arrow)]);
         }
         w->lastX = x;
         w->lastY = y;
@@ -224,8 +214,8 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
             return;
         }
 
-        // All remaining keys apply to current "focus" element
-        if(w->focus) w->focus->OnKey(window, key, action, mods);
+        if(w->dragger && w->dragger->OnKey(key, action, mods)) return; // If one is present, a dragger can consume keystrokes
+        if(w->focus) w->focus->OnKey(window, key, action, mods); // All remaining keys apply to current "focus" element
     });
 }
 
@@ -256,15 +246,16 @@ void Window::SetGuiRoot(gui::ElementPtr element)
     RefreshLayout();
 }
 
-static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * focus, NVGcolor parentBackground)
+static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * mouseover, const gui::Element * focus, NVGcolor parentBackground)
 {
     gui::DrawEvent e = {vg,parentBackground};
     e.hasFocus = &elem == focus;
+    e.isMouseOver = &elem == mouseover;
 
     nvgSave(vg);
 	nvgScissor(vg, elem.rect.x0, elem.rect.y0, elem.rect.GetWidth(), elem.rect.GetHeight());
     NVGcolor background = elem.OnDrawBackground(e);
-    for(const auto & child : elem.children) DrawElement(vg, *child.element, focus, background);
+    for(const auto & child : elem.children) DrawElement(vg, *child.element, mouseover, focus, background);
     elem.OnDrawForeground(e);
     nvgRestore(vg);
 }
@@ -278,7 +269,7 @@ void Window::Redraw()
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 
     nvgBeginFrame(vg, width, height, 1.0f);
-    DrawElement(vg, *root, focus.get(), nvgRGBA(0,0,0,0));
+    DrawElement(vg, *root, mouseover.get(), focus.get(), nvgRGBA(0,0,0,0));
     nvgEndFrame(vg);
 
     glPopAttrib();

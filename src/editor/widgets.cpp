@@ -146,7 +146,7 @@ gui::DraggerPtr Text::OnClick(const gui::MouseEvent & e)
     };
 
     isSelecting = false;
-    MoveSelectionCursor(font.GetUnitIndex(text, e.cursor.x - rect.x0), e.shift);
+    MoveSelectionCursor(font.GetUnitIndex(text, e.cursor.x - rect.x0), e.IsShiftHeld());
     return std::make_shared<SelectionDragger>(*this);
 }
 
@@ -350,4 +350,47 @@ void Border::OnDrawForeground(const gui::DrawEvent & e) const
 }
 
 std::shared_ptr<Border> Border::CreateBigBorder(gui::ElementPtr inner) { return std::make_shared<Border>(4, 1.5f, 2.0f, 4.5f, nvgRGBA(0,0,0,192), nvgRGBA(64,64,64,255), inner); }
-std::shared_ptr<Border> Border::CreateEditBorder(gui::ElementPtr inner) { return std::make_shared<Border>(1, 0.5f, 1.0f, 2.5f, nvgRGBA(0,0,0,128), nvgRGBA(88,88,88,255), inner); }
+std::shared_ptr<Border> Border::CreateEditBorder(gui::ElementPtr inner) { return std::make_shared<Border>(2, 0.5f, 1.0f, 2.5f, nvgRGBA(0,0,0,128), nvgRGBA(88,88,88,255), inner); }
+
+////////////////
+// MenuButton //
+////////////////
+
+MenuButton::MenuButton(const Font & font, const std::string & label)
+{
+    auto text = std::make_shared<Text>(font);
+    text->isTransparent = true;
+    text->text = label;
+    children.push_back({{{0,2},{0,2},{1,-2},{1,-2}}, text});
+}
+
+NVGcolor MenuButton::OnDrawBackground(const gui::DrawEvent & e) const
+{
+    if(e.isMouseOver)
+    {
+	    nvgBeginPath(e.vg);
+	    nvgRect(e.vg, rect.x0, rect.y0, rect.GetWidth(), rect.GetHeight());
+        nvgFillColor(e.vg, nvgRGBA(115,98,50,255));
+        nvgFill(e.vg);
+
+	    nvgStrokeColor(e.vg, nvgRGBA(253,244,191,255));
+        nvgStrokeWidth(e.vg, 1);
+	    nvgStroke(e.vg);
+        return nvgRGBA(115,98,50,255);
+    }
+    return e.parent;
+}
+
+gui::DraggerPtr MenuButton::OnClick(const gui::MouseEvent & e)
+{
+    return nullptr;
+}
+
+NVGcolor MenuBar::OnDrawBackground(const gui::DrawEvent & e) const
+{
+	nvgBeginPath(e.vg);
+	nvgRect(e.vg, rect.x0, rect.y0, rect.GetWidth(), rect.GetHeight());
+    nvgFillColor(e.vg, nvgRGBA(64,64,64,255));
+    nvgFill(e.vg);
+    return nvgRGBA(64,64,64,255);
+}

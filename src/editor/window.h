@@ -22,7 +22,7 @@ class Window
     std::vector<gui::ElementPtr> tabStops;
     
     // Text manipulation logic
-    gui::ElementPtr focus;
+    gui::ElementPtr mouseover, focus;
     gui::DraggerPtr dragger;
     int lastX, lastY;
 
@@ -31,7 +31,6 @@ class Window
 
     void CancelDrag();
     void TabTo(gui::ElementPtr element);
-    void OnClick(gui::ElementPtr clickfocus, int mouseX, int mouseY, bool holdingShift);
 public:
     Window(const char * title, int width, int height);
     ~Window();

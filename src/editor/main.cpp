@@ -167,7 +167,18 @@ struct View : public gui::Element
         MouselookDragger(View & view, const int2 & click) : view(view), lastMouse(click) {}
 
         void OnDrag(int2 newMouse) override { view.OnDrag(newMouse - lastMouse); lastMouse = newMouse; }
-        void OnRelease() override {}
+        bool OnKey(int key, int action, int mods) override
+        {
+            switch(key)
+            {
+            case GLFW_KEY_W: view.bf = action != GLFW_RELEASE; break;
+            case GLFW_KEY_A: view.bl = action != GLFW_RELEASE; break;
+            case GLFW_KEY_S: view.bb = action != GLFW_RELEASE; break;
+            case GLFW_KEY_D: view.br = action != GLFW_RELEASE; break;
+            }
+            return true;
+        }
+        void OnRelease() override { view.bf = view.bl = view.bb = view.br = false; }
         void OnCancel() override {}
     };
 
@@ -198,20 +209,17 @@ struct View : public gui::Element
     
     void OnKey(GLFWwindow * window, int key, int action, int mods) override
     {
-        switch(key)
-        {
-        case GLFW_KEY_W: bf = action != GLFW_RELEASE; break;
-        case GLFW_KEY_A: bl = action != GLFW_RELEASE; break;
-        case GLFW_KEY_S: bb = action != GLFW_RELEASE; break;
-        case GLFW_KEY_D: br = action != GLFW_RELEASE; break;
-        }
+        
     }
 
     NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override
     {
+        int winWidth, winHeight;
+        glfwGetWindowSize(glfwGetCurrentContext(), &winWidth, &winHeight);
+
         glPushAttrib(GL_ALL_ATTRIB_BITS);
-        glViewport(rect.x0, rect.y0, rect.x1-rect.x0, rect.y1-rect.y0);
-        glScissor(rect.x0, rect.y0, rect.x1-rect.x0, rect.y1-rect.y0);
+        glViewport(rect.x0, winHeight - rect.y1, rect.GetWidth(), rect.GetHeight());
+        glScissor(rect.x0, winHeight - rect.y1, rect.GetWidth(), rect.GetHeight());
         glEnable(GL_SCISSOR_TEST);
         glClearColor(0,0,1,1);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -233,30 +241,33 @@ struct View : public gui::Element
             selection.object->prog = prog;
             glPopAttrib();
 
-            glClear(GL_DEPTH_BUFFER_BIT);
-            auto model = TranslationMatrix(selection.object->position);
-            auto mvp = mul(viewProj, model);
-            glUseProgram(selection.arrowProg);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-            glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_eye"), 1, &viewpoint.position.x);
-            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 0.2f, 0.2f, 1.0f);
-            glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_lightPos"), 1, &scene.objects.back().position.x);
-            selection.arrowMesh.Draw();
+            if(e.hasFocus)
+            {
+                glClear(GL_DEPTH_BUFFER_BIT);
+                auto model = TranslationMatrix(selection.object->position);
+                auto mvp = mul(viewProj, model);
+                glUseProgram(selection.arrowProg);
+                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_eye"), 1, &viewpoint.position.x);
+                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 0.2f, 0.2f, 1.0f);
+                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_lightPos"), 1, &scene.objects.back().position.x);
+                selection.arrowMesh.Draw();
 
-            model = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Matrix();
-            mvp = mul(viewProj, model);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 0.2f, 1.0f, 0.2f);
-            selection.arrowMesh.Draw();
+                model = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Matrix();
+                mvp = mul(viewProj, model);
+                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 0.2f, 1.0f, 0.2f);
+                selection.arrowMesh.Draw();
 
-            model = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Matrix();
-            mvp = mul(viewProj, model);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 1.0f, 0.2f, 0.2f);
-            selection.arrowMesh.Draw();
+                model = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Matrix();
+                mvp = mul(viewProj, model);
+                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 1.0f, 0.2f, 0.2f);
+                selection.arrowMesh.Draw();
+            }
         }
 
         glPopAttrib();
@@ -275,28 +286,37 @@ struct View : public gui::Element
 
     gui::DraggerPtr OnClick(const gui::MouseEvent & e) override
     {
-        Raycaster caster(rect, PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f), viewpoint);
-        Ray ray = caster.ComputeRay(e.cursor);
-            
-        if(selection.object)
+        // Mouselook when the user drags the right mouse button
+        if(e.button == GLFW_MOUSE_BUTTON_RIGHT) return std::make_shared<MouselookDragger>(*this, e.cursor);
+
+        // Respond to left mouse button clicks with a raycast
+        if(e.button == GLFW_MOUSE_BUTTON_LEFT)
         {
-            auto localRay = ray;
-            localRay.start -= selection.object->position;
-            auto hit = selection.arrowMesh.Hit(localRay);
-            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,0,1), e.cursor);
+            Raycaster caster(rect, PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f), viewpoint);
+            Ray ray = caster.ComputeRay(e.cursor);
+            
+            // If an object is selected, check if we have clicked on its gizmo
+            if(selection.object)
+            {
+                auto localRay = Pose(selection.object->position, {0,0,0,1}).Inverse() * ray;
+                auto hit = selection.arrowMesh.Hit(localRay);
+                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,0,1), e.cursor);
 
-            localRay = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Inverse() * ray;
-            hit = selection.arrowMesh.Hit(localRay);
-            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,1,0), e.cursor);
+                localRay = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Inverse() * ray;
+                hit = selection.arrowMesh.Hit(localRay);
+                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,1,0), e.cursor);
 
-            localRay = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Inverse() * ray;
-            hit = selection.arrowMesh.Hit(localRay);
-            if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(1,0,0), e.cursor);
+                localRay = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Inverse() * ray;
+                hit = selection.arrowMesh.Hit(localRay);
+                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(1,0,0), e.cursor);
+            }
+
+            // Otherwise see if we have selected a new object
+            if(auto obj = scene.Hit(ray)) selection.SetSelection(obj);
+            // If we did not click on an object directly, perhaps we should box select? 
         }
 
-        if(auto obj = scene.Hit(ray)) selection.SetSelection(obj);
-
-        return std::make_shared<MouselookDragger>(*this, e.cursor);
+        return nullptr;
     }
 };
 
@@ -407,7 +427,17 @@ void main()
         auto topRightPanel = Border::CreateBigBorder(objectList);
         auto bottomRightPanel = Border::CreateBigBorder(propertyPanel);
         auto rightPanel = std::make_shared<Splitter>(bottomRightPanel, topRightPanel, Splitter::Top, 200);
-        guiRoot = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
+        auto mainPanel = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
+
+        auto menuBar = std::make_shared<MenuBar>();
+        auto button1 = std::make_shared<MenuButton>(font, "File");        
+        auto button2 = std::make_shared<MenuButton>(font, "Edit");
+        menuBar->children.push_back({{{0,0}, {0,2}, {0,100}, {1,-2}}, button1});
+        menuBar->children.push_back({{{0,100}, {0,2}, {0,200}, {1,-2}}, button2});
+
+        auto guiRoot = std::make_shared<gui::Element>();
+        guiRoot->children.push_back({{{0,0}, {0,0}, {1,0}, {0,32}}, menuBar});
+        guiRoot->children.push_back({{{0,0}, {0,32}, {1,0}, {1,0}}, mainPanel});
     
         selection.onSelectionChanged = [this]()
         {

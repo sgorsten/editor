@@ -2,6 +2,7 @@
 #define EDITOR_GUI_H
 
 #include "engine/linalg.h"
+#include "engine/gl.h"
 #include "nanovg.h"
 
 #include <string>
@@ -21,6 +22,7 @@ namespace gui
     struct IDragger
     {
         virtual void OnDrag(int2 newMouse) = 0;
+        virtual bool OnKey(int key, int action, int mods) { return false; }
         virtual void OnRelease() = 0;
         virtual void OnCancel() = 0;
     };
@@ -58,7 +60,12 @@ namespace gui
     struct MouseEvent
     {
         int2 cursor;
-        bool shift;
+        int button;
+        int mods;
+
+        bool IsShiftHeld() const { return !!(mods & GLFW_MOD_SHIFT); }
+        bool IsControlHeld() const { return !!(mods & GLFW_MOD_CONTROL); }
+        bool IsAltHeld() const { return !!(mods & GLFW_MOD_ALT); }
     };
 
     struct DrawEvent
@@ -74,6 +81,7 @@ namespace gui
     {
         Rect                                                rect;
         std::vector<Child>                                  children;
+        bool                                                isTransparent = false;  // If true, this element will ignore mouse events
         
                                                             Element();
 
