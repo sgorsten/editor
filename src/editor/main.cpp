@@ -431,23 +431,18 @@ void main()
         auto rightPanel = std::make_shared<Splitter>(bottomRightPanel, topRightPanel, Splitter::Top, 200);
         auto mainPanel = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
         
-        auto menuBar = std::make_shared<Menu>(font);
-        auto fileMenu = menuBar->AddPopup("File");
-        fileMenu->AddItem("New",  [](){});
-        fileMenu->AddItem("Open", [](){});
-        fileMenu->AddItem("Save", [](){});
-        fileMenu->AddItem("Exit", [this]() { quit = true; });
-        auto editMenu = menuBar->AddPopup("Edit");
-        editMenu->AddItem("Cut",   [](){});
-        editMenu->AddItem("Copy",  [](){});
-        editMenu->AddItem("Paste", [](){});
+        std::vector<MenuItem> menuItems;
+        menuItems.push_back({true, "File", {}, {}});
+        menuItems[0].children.push_back({true, "New",  {}, [](){}});
+        menuItems[0].children.push_back({true, "Open", {}, [](){}});
+        menuItems[0].children.push_back({true, "Save", {}, [](){}});
+        menuItems[0].children.push_back({true, "Exit", {}, [this]() { quit = true; }});
+        menuItems.push_back({true, "Edit", {}, {}});
+        menuItems[1].children.push_back({true, "Cut",  {}, [](){}});
+        menuItems[1].children.push_back({true, "Copy", {}, [](){}});
+        menuItems[1].children.push_back({true, "Paste", {}, [](){}});
 
-        auto guiRoot = std::make_shared<gui::Element>();
-        guiRoot->AddChild({{0,0}, {0,32}, {1,0}, {1,0}}, mainPanel);
-        guiRoot->AddChild({{0,0}, {0,0}, {1,0}, {1,0}}, menuBar->GetModalBarrier());
-        guiRoot->AddChild({{0,0}, {0,0}, {1,0}, {0,32}}, menuBar);
-        guiRoot->AddChild({{0,0}, {0,32}, {0,100}, {0,112}}, fileMenu);
-        guiRoot->AddChild({{0,100}, {0,32}, {0,200}, {0,112}}, editMenu);
+        auto guiRoot = std::make_shared<Menu>(font, menuItems, mainPanel);
     
         selection.onSelectionChanged = [this]()
         {

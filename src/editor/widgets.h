@@ -6,6 +6,13 @@
 #include <sstream>
 #include <algorithm>
 
+struct Fill : public gui::Element
+{
+    NVGcolor color;
+    Fill(NVGcolor color) : color(color) {}
+    NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
+};
+
 class Text : public gui::Element
 {
     const Font & font;
@@ -81,48 +88,23 @@ public:
     std::function<void()> onSelectionChanged;
 };
 
-class Menu;
-
-class ModalBarrier : public gui::Element
+struct MenuItem
 {
-    Menu & menu;
-public:
-    ModalBarrier(Menu & menu) : menu(menu) {}
-
-    gui::DraggerPtr OnClick(const gui::MouseEvent & e) override;
-};
-
-class MenuButton : public gui::Element
-{
-    std::function<void()> func;
-public:
-    MenuButton(const Font & font, const std::string & label, std::function<void()> func);
-               
-    NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
-    gui::DraggerPtr OnClick(const gui::MouseEvent & e) override;
+    // TODO: Icon, hotkeys, etc
+    bool isEnabled;                 // If true, this menu item can be clicked on
+    std::string label;              // The string that should be displayed for this item
+    std::vector<MenuItem> children; // If nonempty, clicking on this item will open a popup menu
+    std::function<void()> onClick;  // If bound, clicking on this item will invoke this function
 };
 
 class Menu : public gui::Element
 {
-    friend class ModalBarrier;
+    class Barrier;
+    std::shared_ptr<Barrier> barrier;
 
-    const Font & font;
-    std::shared_ptr<ModalBarrier> mbar;
-    std::vector<std::shared_ptr<Menu>> popups;
-    Menu * topLevel;
-    size_t level;
-
-    void ActivatePopup(size_t level, std::shared_ptr<Menu> popup);
-    void DeactivateBarrier();
+    std::weak_ptr<gui::Element> MakePopup(const Font & font, const std::vector<MenuItem> & items, float x, float y);
 public:
-    Menu(const Font & font) : font(font), mbar(std::make_shared<ModalBarrier>(*this)), topLevel(nullptr), level(0) {}
-
-    void AddItem(const std::string & label, std::function<void()> func);
-    std::shared_ptr<Menu> AddPopup(const std::string & label);
-    
-    std::shared_ptr<ModalBarrier> GetModalBarrier() { return mbar; }
-
-    NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
+    Menu(const Font & font, const std::vector<MenuItem> & items, gui::ElementPtr inner);
 };
 
 class GuiFactory
