@@ -191,14 +191,18 @@ NVGcolor Text::OnDrawBackground(const gui::DrawEvent & e) const
         nvgFill(e.vg);
     }
 
-    // Fade text to the right
-    auto transparentBackground = e.parent;
-    transparentBackground.a = 0;
-    auto bg = nvgLinearGradient(e.vg, rect.x1-6, rect.y0, rect.x1, rect.y0, transparentBackground, e.parent);
-    nvgBeginPath(e.vg);
-    nvgRect(e.vg, rect.x1-6, rect.y0, 6, font.GetLineHeight());
-    nvgFillPaint(e.vg, bg);
-    nvgFill(e.vg);
+    if(font.GetStringWidth(text) > rect.GetWidth())
+    {
+        // Fade text to the right
+        auto transparentBackground = e.parent;
+        transparentBackground.a = 0;
+        auto bg = nvgLinearGradient(e.vg, rect.x1-6, rect.y0, rect.x1, rect.y0, transparentBackground, e.parent);
+        nvgBeginPath(e.vg);
+        nvgRect(e.vg, rect.x1-6, rect.y0, 6, font.GetLineHeight());
+        nvgFillPaint(e.vg, bg);
+        nvgFill(e.vg);
+    }
+
     return e.parent;
 }
 
@@ -400,12 +404,12 @@ class MenuButton : public gui::Element
 {
     std::function<void()> func;
 public:
-    MenuButton(const Font & font, const std::string & label, std::function<void()> func) : func(func)
+    MenuButton(const Font & font, const std::string & label, int offset, std::function<void()> func) : func(func)
     {
         auto text = std::make_shared<Text>(font);
         text->isTransparent = true;
         text->text = label;
-        children.push_back({{{0,2},{0,0},{1,-2},{1,0}}, text});
+        children.push_back({{{0,offset},{0,2},{1,-offset},{1,-2}}, text});
     }
 
     gui::DraggerPtr OnClick(const gui::MouseEvent & e) { func(); return {}; }
@@ -439,7 +443,7 @@ std::weak_ptr<gui::Element> Menu::MakePopup(const Font & font, const std::vector
     for(auto & item : items)
     {
         placement.y0 = placement.y1;
-        placement.y1.b += font.GetLineHeight();
+        placement.y1.b += font.GetLineHeight() + 4;
 
         auto func = item.onClick;
         if(!item.children.empty())
@@ -452,7 +456,7 @@ std::weak_ptr<gui::Element> Menu::MakePopup(const Font & font, const std::vector
             auto f = item.onClick;
             func = [bar,f]() { bar->HidePopups(); f(); };
         }
-        popup->AddChild(placement, std::make_shared<MenuButton>(font, item.label, func));
+        popup->AddChild(placement, std::make_shared<MenuButton>(font, item.label, 10, func));
     }
 
     AddChild({{0,x}, {0,y}, {0,x+100}, {0,y+placement.y1.b}}, popup);
@@ -487,6 +491,6 @@ Menu::Menu(const Font & font, const std::vector<MenuItem> & items, gui::ElementP
             func = [bar,f]() { bar->HidePopups(); f(); };
         }
 
-        AddChild(placement, std::make_shared<MenuButton>(font, item.label, func));
+        AddChild(placement, std::make_shared<MenuButton>(font, item.label, 10, func));
     }
 }
