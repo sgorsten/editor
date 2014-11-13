@@ -350,8 +350,10 @@ class Editor
     Scene                   scene;
     Selection               selection;
     std::shared_ptr<View>   view;
+
+    bool                    quit;
 public:
-    Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2)
+    Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), quit()
     {
         view = std::make_shared<View>(scene, selection);
 
@@ -428,16 +430,24 @@ void main()
         auto bottomRightPanel = Border::CreateBigBorder(propertyPanel);
         auto rightPanel = std::make_shared<Splitter>(bottomRightPanel, topRightPanel, Splitter::Top, 200);
         auto mainPanel = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
-
-        auto menuBar = std::make_shared<MenuBar>();
-        auto button1 = std::make_shared<MenuButton>(font, "File");        
-        auto button2 = std::make_shared<MenuButton>(font, "Edit");
-        menuBar->children.push_back({{{0,0}, {0,2}, {0,100}, {1,-2}}, button1});
-        menuBar->children.push_back({{{0,100}, {0,2}, {0,200}, {1,-2}}, button2});
+        
+        auto menuBar = std::make_shared<Menu>(font);
+        auto fileMenu = menuBar->AddPopup("File");
+        fileMenu->AddItem("New",  [](){});
+        fileMenu->AddItem("Open", [](){});
+        fileMenu->AddItem("Save", [](){});
+        fileMenu->AddItem("Exit", [this]() { quit = true; });
+        auto editMenu = menuBar->AddPopup("Edit");
+        editMenu->AddItem("Cut",   [](){});
+        editMenu->AddItem("Copy",  [](){});
+        editMenu->AddItem("Paste", [](){});
 
         auto guiRoot = std::make_shared<gui::Element>();
-        guiRoot->children.push_back({{{0,0}, {0,0}, {1,0}, {0,32}}, menuBar});
-        guiRoot->children.push_back({{{0,0}, {0,32}, {1,0}, {1,0}}, mainPanel});
+        guiRoot->AddChild({{0,0}, {0,32}, {1,0}, {1,0}}, mainPanel);
+        guiRoot->AddChild({{0,0}, {0,0}, {1,0}, {1,0}}, menuBar->GetModalBarrier());
+        guiRoot->AddChild({{0,0}, {0,0}, {1,0}, {0,32}}, menuBar);
+        guiRoot->AddChild({{0,0}, {0,32}, {0,100}, {0,112}}, fileMenu);
+        guiRoot->AddChild({{0,100}, {0,32}, {0,200}, {0,112}}, editMenu);
     
         selection.onSelectionChanged = [this]()
         {
@@ -470,7 +480,7 @@ void main()
     int Run()
     {
         auto t0 = glfwGetTime();
-        while(!window.ShouldClose())
+        while(!quit && !window.ShouldClose())
         {
             glfwPollEvents();
 

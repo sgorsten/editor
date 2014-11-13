@@ -77,14 +77,18 @@ namespace gui
         bool isMouseOver;   // True if the mouse is presently over this element
     };
 
+    struct Element;
+    typedef std::shared_ptr<Element> ElementPtr;
     struct Element
     {
         Rect                                                rect;
         std::vector<Child>                                  children;
-        bool                                                isTransparent = false;  // If true, this element will ignore mouse events
+        bool                                                isVisible;
+        bool                                                isTransparent;  // If true, this element will ignore mouse events
         
                                                             Element();
 
+        void                                                AddChild(const URect & placement, ElementPtr child);
         void                                                SetRect(const Rect & rect);
 
         virtual bool                                        IsTabStop() const { return false; }
@@ -97,8 +101,6 @@ namespace gui
         virtual DraggerPtr                                  OnClick(const MouseEvent & e) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
         virtual void                                        OnTab() {}
     };
-
-    typedef std::shared_ptr<Element> ElementPtr;
 
     struct Child
     {

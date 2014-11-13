@@ -7,7 +7,7 @@
 
 gui::ElementPtr GetElement(const gui::ElementPtr & element, int x, int y)
 {
-    if(element->isTransparent) return nullptr;
+    if(!element->isVisible || element->isTransparent) return nullptr;
 
     for(auto it = element->children.rbegin(), end = element->children.rend(); it != end; ++it)
     {
@@ -248,6 +248,7 @@ void Window::SetGuiRoot(gui::ElementPtr element)
 
 static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::Element * mouseover, const gui::Element * focus, NVGcolor parentBackground)
 {
+    if(!elem.isVisible) return;
     gui::DrawEvent e = {vg,parentBackground};
     e.hasFocus = &elem == focus;
     e.isMouseOver = &elem == mouseover;

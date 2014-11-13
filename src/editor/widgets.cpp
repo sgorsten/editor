@@ -356,7 +356,7 @@ std::shared_ptr<Border> Border::CreateEditBorder(gui::ElementPtr inner) { return
 // MenuButton //
 ////////////////
 
-MenuButton::MenuButton(const Font & font, const std::string & label)
+MenuButton::MenuButton(const Font & font, const std::string & label, std::function<void()> func) : func(func)
 {
     auto text = std::make_shared<Text>(font);
     text->isTransparent = true;
@@ -381,12 +381,80 @@ NVGcolor MenuButton::OnDrawBackground(const gui::DrawEvent & e) const
     return e.parent;
 }
 
+gui::DraggerPtr ModalBarrier::OnClick(const gui::MouseEvent & e) { menu.DeactivateBarrier(); return {}; }
+
+void Menu::ActivatePopup(size_t level, std::shared_ptr<Menu> popup)
+{
+    while(popups.size() > level)
+    {
+        popups.back()->isVisible = false;
+        popups.pop_back();
+    }
+    popups.push_back(popup);
+    popup->isVisible = true;
+    mbar->isTransparent = false;
+}
+
+void Menu::DeactivateBarrier()
+{
+    while(!popups.empty())
+    {
+        popups.back()->isVisible = false;
+        popups.pop_back();
+    }
+    mbar->isTransparent = true;
+}
+
 gui::DraggerPtr MenuButton::OnClick(const gui::MouseEvent & e)
 {
+    func();
     return nullptr;
 }
 
-NVGcolor MenuBar::OnDrawBackground(const gui::DrawEvent & e) const
+std::shared_ptr<Menu> Menu::AddPopup(const std::string & label)
+{
+    auto popup = std::make_shared<Menu>(font);
+    popup->topLevel = this;
+    popup->level = level+1;
+    popup->isVisible = false;
+
+    if(topLevel)
+    {
+        auto placement = children.empty() ? gui::URect{{0,0},{0,0},{1,0},{0,0}} : children.back().placement;
+        placement.y0 = placement.y1;
+        placement.y1.b += 20;
+        AddChild(placement, std::make_shared<MenuButton>(font, label, [this,popup]() { topLevel->ActivatePopup(level, popup); }));
+    }
+    else
+    {
+        auto placement = children.empty() ? gui::URect{{0,0},{0,0},{0,0},{1,0}} : children.back().placement;
+        placement.x0 = placement.x1;
+        placement.x1.b += font.GetStringWidth(label) + 10;
+        AddChild(placement, std::make_shared<MenuButton>(font, label, [this,popup]() { this->ActivatePopup(level, popup); }));
+    }
+
+    return popup;
+}
+
+void Menu::AddItem(const std::string & label, std::function<void()> func)
+{
+    if(topLevel)
+    {
+        auto placement = children.empty() ? gui::URect{{0,0},{0,0},{1,0},{0,0}} : children.back().placement;
+        placement.y0 = placement.y1;
+        placement.y1.b += 20;
+        AddChild(placement, std::make_shared<MenuButton>(font, label, [this,func]() { topLevel->DeactivateBarrier(); func(); }));
+    }
+    else
+    {
+        auto placement = children.empty() ? gui::URect{{0,0},{0,0},{0,0},{1,0}} : children.back().placement;
+        placement.x0 = placement.x1;
+        placement.x1.b += font.GetStringWidth(label) + 10;
+        AddChild(placement, std::make_shared<MenuButton>(font, label, [this,func]() { this->DeactivateBarrier(); func(); }));
+    }
+}
+
+NVGcolor Menu::OnDrawBackground(const gui::DrawEvent & e) const
 {
 	nvgBeginPath(e.vg);
 	nvgRect(e.vg, rect.x0, rect.y0, rect.GetWidth(), rect.GetHeight());

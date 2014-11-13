@@ -3,7 +3,12 @@
 
 namespace gui
 {
-    Element::Element() : rect({}) {}
+    Element::Element() : rect({}), isVisible(true), isTransparent(false) {}
+
+    void Element::AddChild(const URect & placement, ElementPtr child)
+    {
+        children.push_back({placement, child});
+    }
 
     void Element::SetRect(const Rect & rect)
     {
