@@ -38,6 +38,8 @@ namespace gui
     struct Rect
     {
         int x0,y0,x1,y1;
+        float GetCenterX() const { return (x0+x1)*0.5f; }
+        float GetCenterY() const { return (y0+y1)*0.5f; }
         int GetWidth() const { return x1-x0; }
         int GetHeight() const { return y1-y0; }
         float GetAspect() const { return (float)GetWidth()/GetHeight(); }

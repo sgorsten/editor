@@ -403,8 +403,9 @@ public:
 class MenuButton : public gui::Element
 {
     std::function<void()> func;
+    bool isPopup;
 public:
-    MenuButton(const Font & font, const std::string & label, int offset, std::function<void()> func) : func(func)
+    MenuButton(const Font & font, const std::string & label, int offset, std::function<void()> func, bool isPopup) : func(func), isPopup(isPopup)
     {
         auto text = std::make_shared<Text>(font);
         text->isTransparent = true;
@@ -416,6 +417,8 @@ public:
 
     NVGcolor MenuButton::OnDrawBackground(const gui::DrawEvent & e) const
     {
+        auto bg = e.parent;
+
         if(e.isMouseOver)
         {
 	        nvgBeginPath(e.vg);
@@ -428,15 +431,27 @@ public:
 	        nvgStrokeColor(e.vg, nvgRGBA(253,244,191,255));
             nvgStrokeWidth(e.vg, 1);
 	        nvgStroke(e.vg);
-            return nvgRGBA(115,98,50,255);
+            bg = nvgRGBA(115,98,50,255);
         }
-        return e.parent;
+
+        if(isPopup)
+        {
+            nvgBeginPath(e.vg);
+            nvgMoveTo(e.vg, rect.x1 - 8, rect.GetCenterY() - 3);
+            nvgLineTo(e.vg, rect.x1 - 3, rect.GetCenterY() + 0);
+            nvgLineTo(e.vg, rect.x1 - 8, rect.GetCenterY() + 3);
+            nvgLineTo(e.vg, rect.x1 - 8, rect.GetCenterY() - 3);
+            nvgFillColor(e.vg, nvgRGBA(255,255,255,255));
+            nvgFill(e.vg);            
+        }
+
+        return bg;
     }
 };
 
-std::weak_ptr<gui::Element> Menu::MakePopup(const Font & font, const std::vector<MenuItem> & items, float x, float y)
+std::weak_ptr<gui::Element> Menu::MakePopup(size_t level, const Font & font, const std::vector<MenuItem> & items, float x, float y)
 {
-    auto popup = std::make_shared<Fill>(nvgRGBA(64,64,64,255));
+    auto popup = std::make_shared<gui::Element>();
 
     auto bar = barrier;
     gui::URect placement = {{0,0}, {0,0}, {1,0}, {0,0}};
@@ -448,23 +463,25 @@ std::weak_ptr<gui::Element> Menu::MakePopup(const Font & font, const std::vector
         auto func = item.onClick;
         if(!item.children.empty())
         {
-            auto childPopup = MakePopup(font, item.children, x+100, y+placement.y0.b);
-            func = [bar,childPopup]() { if(auto pop = childPopup.lock()) bar->ShowPopup(0, pop); };
+            auto childPopup = MakePopup(level + 1, font, item.children, x+98, y+placement.y0.b);
+            func = [bar,childPopup,level]() { if(auto pop = childPopup.lock()) bar->ShowPopup(level, pop); };
         }
         else
         {
             auto f = item.onClick;
             func = [bar,f]() { bar->HidePopups(); f(); };
         }
-        popup->AddChild(placement, std::make_shared<MenuButton>(font, item.label, 10, func));
+        popup->AddChild(placement, std::make_shared<MenuButton>(font, item.label, 10, func, !item.children.empty()));
     }
 
-    AddChild({{0,x}, {0,y}, {0,x+100}, {0,y+placement.y1.b}}, popup);
+    popup = std::make_shared<Border>(1, 0.5f, 1.0f, 0, nvgRGBA(0,0,0,255), nvgRGBA(64,64,64,255), popup);
+
+    AddChild({{0,x}, {0,y}, {0,x+100}, {0,y+placement.y1.b+2}}, popup);
     popup->isVisible = false;
     return popup;
 }
 
-Menu::Menu(const Font & font, const std::vector<MenuItem> & items, gui::ElementPtr inner)
+Menu::Menu(gui::ElementPtr inner, const Font & font, const std::vector<MenuItem> & items)
 {
     float menuSize = 24;
     AddChild({{0,0}, {0,0}, {1,0}, {0,menuSize}}, std::make_shared<Fill>(nvgRGBA(64,64,64,255)));
@@ -482,7 +499,7 @@ Menu::Menu(const Font & font, const std::vector<MenuItem> & items, gui::ElementP
         auto func = item.onClick;
         if(!item.children.empty())
         {
-            auto popup = MakePopup(font, item.children, placement.x0.b, placement.y1.b);
+            auto popup = MakePopup(1, font, item.children, placement.x0.b, placement.y1.b);
             func = [bar,popup]() { if(auto pop = popup.lock()) bar->ShowPopup(0, pop); };
         }
         else
@@ -491,6 +508,8 @@ Menu::Menu(const Font & font, const std::vector<MenuItem> & items, gui::ElementP
             func = [bar,f]() { bar->HidePopups(); f(); };
         }
 
-        AddChild(placement, std::make_shared<MenuButton>(font, item.label, 10, func));
+        AddChild(placement, std::make_shared<MenuButton>(font, item.label, 10, func, false));
     }
+
+    std::reverse(children.begin()+3, children.end());
 }

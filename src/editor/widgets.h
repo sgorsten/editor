@@ -95,16 +95,21 @@ struct MenuItem
     std::string label;              // The string that should be displayed for this item
     std::vector<MenuItem> children; // If nonempty, clicking on this item will open a popup menu
     std::function<void()> onClick;  // If bound, clicking on this item will invoke this function
+
+    MenuItem() : isEnabled(true) {}
+    MenuItem(const std::string & label) : isEnabled(true), label(label) {}
+    MenuItem(const std::string & label, std::function<void()> onClick) : isEnabled(true), label(label), onClick(onClick) {}
+
+    static MenuItem Popup(std::string label, std::vector<MenuItem> children) { auto r = MenuItem(); r.label = move(label); r.children = move(children); return r; }
 };
 
 class Menu : public gui::Element
 {
     class Barrier;
     std::shared_ptr<Barrier> barrier;
-
-    std::weak_ptr<gui::Element> MakePopup(const Font & font, const std::vector<MenuItem> & items, float x, float y);
+    std::weak_ptr<gui::Element> MakePopup(size_t level, const Font & font, const std::vector<MenuItem> & items, float x, float y);
 public:
-    Menu(const Font & font, const std::vector<MenuItem> & items, gui::ElementPtr inner);
+    Menu(gui::ElementPtr inner, const Font & font, const std::vector<MenuItem> & items);
 };
 
 class GuiFactory
