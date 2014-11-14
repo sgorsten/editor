@@ -14,17 +14,17 @@
 
 struct Selection
 {
-    Object * object;
+    std::weak_ptr<Object> object;
     GLuint selectionProgram;
 
     Mesh arrowMesh;
     GLuint arrowProg;
 
-    Selection() : object(), selectionProgram() {}
+    Selection() : selectionProgram() {}
 
-    void SetSelection(Object * object)
+    void SetSelection(std::shared_ptr<Object> object)
     {
-        if(object != this->object)
+        if(object != this->object.lock())
         {
             this->object = object; 
             if(onSelectionChanged) onSelectionChanged();
@@ -143,44 +143,46 @@ struct View : public gui::Element
         auto viewProj = mul(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f), viewpoint.Inverse().Matrix());
         scene.Draw(viewProj, viewpoint.position);
 
-        if(selection.object)
+        if(auto obj = selection.object.lock())
         {
             glPushAttrib(GL_ALL_ATTRIB_BITS);
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glDepthFunc(GL_LEQUAL);
             glEnable(GL_POLYGON_OFFSET_LINE);
             glPolygonOffset(-1, -1);
-            auto prog = selection.object->prog;
-            selection.object->prog = selection.selectionProgram;
-            selection.object->Draw(viewProj, viewpoint.position, {});
-            selection.object->prog = prog;
+            auto prog = obj->prog;
+            obj->prog = selection.selectionProgram;
+            obj->Draw(viewProj, viewpoint.position, {});
+            obj->prog = prog;
             glPopAttrib();
 
             if(e.hasFocus)
             {
                 glClear(GL_DEPTH_BUFFER_BIT);
-                auto model = TranslationMatrix(selection.object->position);
+                auto model = TranslationMatrix(obj->position);
                 auto mvp = mul(viewProj, model);
                 glUseProgram(selection.arrowProg);
                 glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
                 glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
                 glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_eye"), 1, &viewpoint.position.x);
-                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 0.2f, 0.2f, 1.0f);
-                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_lightPos"), 1, &scene.objects.back().position.x);
+                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.1f, 0.1f, 0.5f);
+                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.1f, 0.1f, 0.5f);
                 selection.arrowMesh.Draw();
 
-                model = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Matrix();
+                model = Pose(obj->position, RotationQuaternion({1,0,0},-1.57f)).Matrix();
                 mvp = mul(viewProj, model);
                 glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
                 glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 0.2f, 1.0f, 0.2f);
+                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.1f, 0.5f, 0.1f);
+                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.1f, 0.5f, 0.1f);
                 selection.arrowMesh.Draw();
 
-                model = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Matrix();
+                model = Pose(obj->position, RotationQuaternion({0,1,0},+1.57f)).Matrix();
                 mvp = mul(viewProj, model);
                 glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
                 glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_color"), 1.0f, 0.2f, 0.2f);
+                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.5f, 0.1f, 0.1f);
+                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.5f, 0.1f, 0.1f);
                 selection.arrowMesh.Draw();
             }
         }
@@ -211,19 +213,19 @@ struct View : public gui::Element
             Ray ray = caster.ComputeRay(e.cursor);
             
             // If an object is selected, check if we have clicked on its gizmo
-            if(selection.object)
+            if(auto obj = selection.object.lock())
             {
-                auto localRay = Pose(selection.object->position, {0,0,0,1}).Inverse() * ray;
+                auto localRay = Pose(obj->position, {0,0,0,1}).Inverse() * ray;
                 auto hit = selection.arrowMesh.Hit(localRay);
-                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,0,1), e.cursor);
+                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*obj, caster, float3(0,0,1), e.cursor);
 
-                localRay = Pose(selection.object->position, RotationQuaternion({1,0,0},-1.57f)).Inverse() * ray;
+                localRay = Pose(obj->position, RotationQuaternion({1,0,0},-1.57f)).Inverse() * ray;
                 hit = selection.arrowMesh.Hit(localRay);
-                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(0,1,0), e.cursor);
+                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*obj, caster, float3(0,1,0), e.cursor);
 
-                localRay = Pose(selection.object->position, RotationQuaternion({0,1,0},+1.57f)).Inverse() * ray;
+                localRay = Pose(obj->position, RotationQuaternion({0,1,0},+1.57f)).Inverse() * ray;
                 hit = selection.arrowMesh.Hit(localRay);
-                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*selection.object, caster, float3(1,0,0), e.cursor);
+                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*obj, caster, float3(1,0,0), e.cursor);
             }
 
             // Otherwise see if we have selected a new object
@@ -273,27 +275,28 @@ class Editor
     {
         // TODO: Back up and restore selection
         objectList = std::make_shared<ListBox>(font, 2);
-        for(auto & obj : scene.objects) objectList->AddItem(obj.name);
-        objectList->onSelectionChanged = [this]() { selection.SetSelection(&scene.objects[objectList->GetSelectedIndex()]); };
+        for(auto & obj : scene.objects) objectList->AddItem(obj->name);
+        auto it = std::find(begin(scene.objects), end(scene.objects), selection.object.lock());
+        objectList->SetSelectedIndex(it != end(scene.objects) ? it - begin(scene.objects) : -1);
         objectListPanel->children = {{{{0,0},{0,0},{1,0},{1,0}}, objectList}};
+        objectList->onSelectionChanged = [this]() { selection.SetSelection(scene.objects[objectList->GetSelectedIndex()]); };
         RefreshPropertyPanel();
     }
 
     void RefreshPropertyPanel()
     {
         std::vector<std::pair<std::string, gui::ElementPtr>> props;
-        if(selection.object)
+        if(auto obj = selection.object.lock())
         {
-            auto & obj = *selection.object;
-            props.push_back({"Name", factory.MakeEdit(obj.name, [this](const std::string & text)
+            props.push_back({"Name", factory.MakeEdit(obj->name, [this](const std::string & text)
             {
                 int selectedIndex = objectList->GetSelectedIndex();
-                scene.objects[selectedIndex].name = text;
+                scene.objects[selectedIndex]->name = text;
                 objectList->SetItemText(selectedIndex, text);
             })});
-            props.push_back({"Position", factory.MakeVectorEdit(obj.position)});
-            props.push_back({"Color", factory.MakeVectorEdit(obj.color)});
-            props.push_back({"Light Color", factory.MakeVectorEdit(obj.lightColor)});
+            props.push_back({"Position", factory.MakeVectorEdit(obj->position)});
+            props.push_back({"Diffuse Color", factory.MakeVectorEdit(obj->color)});
+            props.push_back({"Emissive Color", factory.MakeVectorEdit(obj->lightColor)});
         }
         propertyPanel->children = {{{{0,0},{0,0},{1,0},{1,0}}, factory.MakePropertyMap(props)}};
         window.RefreshLayout();
@@ -326,13 +329,14 @@ struct PointLight
 };
 uniform PointLight u_lights[8];
 uniform vec3 u_eye;
-uniform vec3 u_color;
+uniform vec3 u_emissive;
+uniform vec3 u_diffuse;
 in vec3 position;
 in vec3 normal;
 void main()
 {
     vec3 eyeDir = normalize(u_eye - position);
-    vec3 light = vec3(0,0,0);
+    vec3 light = u_emissive;
     for(int i=0; i<8; ++i)
     {
         vec3 lightDir = normalize(u_lights[i].position - position);
@@ -341,7 +345,7 @@ void main()
         vec3 halfDir = normalize(lightDir + eyeDir);
         light += u_lights[i].color * pow(max(dot(normal, halfDir), 0), 128);
     }
-    gl_FragColor = vec4(u_color*light,1);
+    gl_FragColor = vec4(u_diffuse*light,1);
 }
 )");
 
@@ -364,13 +368,11 @@ void main()
         mesh = MakeBox({0.5f,0.5f,0.5f});
         ground = MakeBox({4,0.1f,4});
         bulb = MakeBox({0.1f,0.1f,0.1f});
-        scene.objects = {
-            {"Ground",{0,-0.1f,0},{0.4f,0.4f,0.4f},&ground,prog},
-            {"Alpha",{-0.6f,0.5f,0},{1,0,0},&mesh,prog},
-            {"Beta", {+0.6f,0.5f,0},{0,1,0},&mesh,prog},
-            {"Gamma",{ 0.0f,1.5f,0},{1,1,0},&mesh,prog},
-            {"Light",{ 0.0f,3.0f,1.0},{1,1,1},&bulb,prog,{1,1,1}},
-        };
+        scene.CreateObject("Ground",{    0,-0.1f,  0},&ground,prog,{0.4f,0.4f,0.4f},{0,0,0});
+        scene.CreateObject("Alpha", {-0.6f, 0.5f,  0},&mesh,prog,{1,0,0},{0,0,0});
+        scene.CreateObject("Beta",  {+0.6f, 0.5f,  0},&mesh,prog,{0,1,0},{0,0,0});
+        scene.CreateObject("Gamma", { 0.0f, 1.5f,  0},&mesh,prog,{1,1,0},{0,0,0});
+        scene.CreateObject("Light", { 0.0f, 3.0f,1.0},&bulb,prog,{1,1,1},{1,1,1});
         view->viewpoint.position = {0,1,4};
 
         objectListPanel = std::make_shared<gui::Element>();
@@ -397,8 +399,7 @@ void main()
             }),
             MenuItem::Popup("Object", {
                 {"New", [this,prog]() { 
-                    scene.objects.push_back({"New Object",{0,0,0},{1,1,1},&mesh,prog}); 
-                    selection.object = nullptr;
+                    scene.CreateObject("New Object", {0,0,0}, &mesh, prog, {1,1,1}, {0,0,0});
                     RefreshObjectList();
                 }}
             })
@@ -408,7 +409,8 @@ void main()
             
         selection.onSelectionChanged = [this]()
         {
-            objectList->SetSelectedIndex(selection.object ? selection.object - scene.objects.data() : -1);
+            auto it = std::find(begin(scene.objects), end(scene.objects), selection.object.lock());
+            objectList->SetSelectedIndex(it != end(scene.objects) ? it - begin(scene.objects) : -1);
             RefreshPropertyPanel();
         };
         selection.onSelectionChanged();

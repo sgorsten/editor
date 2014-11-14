@@ -4,6 +4,7 @@
 #include "engine/gl.h"
 #include "engine/geometry.h"
 
+#include <memory>
 #include <vector>
 
 struct PointLight { float3 position, color; };
@@ -52,11 +53,24 @@ struct Object
 
 struct Scene
 {
-    std::vector<Object> objects;
+    std::vector<std::shared_ptr<Object>> objects;
 
-    Object * Hit(const Ray & ray);
+    std::shared_ptr<Object> Hit(const Ray & ray);
 
     void Draw(const float4x4 & viewProj, const float3 & eye);
+
+    std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, Mesh * mesh, GLuint prog, const float3 & diffuseColor, const float3 & emissiveColor)
+    {
+        auto obj = std::make_shared<Object>();
+        obj->name = name;
+        obj->position = position;
+        obj->mesh = mesh;
+        obj->prog = prog;
+        obj->color = diffuseColor;
+        obj->lightColor = emissiveColor;
+        objects.push_back(obj);
+        return obj;
+    }
 };
 
 
