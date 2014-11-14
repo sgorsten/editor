@@ -401,6 +401,20 @@ void main()
                 {"New", [this,prog]() { 
                     scene.CreateObject("New Object", {0,0,0}, &mesh, prog, {1,1,1}, {0,0,0});
                     RefreshObjectList();
+                }},
+                {"Duplicate", [this]() { 
+                    auto obj = scene.DuplicateObject(*selection.object.lock());
+                    RefreshObjectList();
+                    selection.SetSelection(obj);
+                }},
+                {"Delete", [this]() { 
+                    auto obj = selection.object.lock();
+                    auto it = std::find(begin(scene.objects), end(scene.objects), obj);
+                    if(it != end(scene.objects))
+                    {
+                        scene.objects.erase(it);
+                        RefreshObjectList();
+                    }
                 }}
             })
         });

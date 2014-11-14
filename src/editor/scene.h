@@ -71,6 +71,13 @@ struct Scene
         objects.push_back(obj);
         return obj;
     }
+
+    std::shared_ptr<Object> DuplicateObject(const Object & original)
+    {
+        auto obj = std::make_shared<Object>(original);
+        objects.push_back(obj);
+        return obj;    
+    }
 };
 
 
