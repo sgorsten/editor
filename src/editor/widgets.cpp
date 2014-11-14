@@ -65,15 +65,15 @@ void Text::OnChar(uint32_t codepoint)
     Insert(utf8::units(codepoint).data());
 }
 
-void Text::OnKey(GLFWwindow * window, int key, int action, int mods)
+bool Text::OnKey(GLFWwindow * window, int key, int action, int mods)
 {
     // Text elements only respond to key presses, not releases
-    if(action == GLFW_RELEASE) return;
+    if(action == GLFW_RELEASE) return false;
 
     if(mods & GLFW_MOD_CONTROL && key == GLFW_KEY_A)
     {
         SelectAll();
-        return;
+        return true;
     }
 
     if(mods & GLFW_MOD_CONTROL && key == GLFW_KEY_C)
@@ -83,11 +83,11 @@ void Text::OnKey(GLFWwindow * window, int key, int action, int mods)
             auto ct = GetSelectionText();
             glfwSetClipboardString(window, ct.c_str());
         }
-        return;
+        return true;
     }
 
     // All subsequent commands apply only to editable text elements
-    if(!isEditable) return;
+    if(!isEditable) return false;
     
     if(mods & GLFW_MOD_CONTROL && key == GLFW_KEY_X)
     {
@@ -97,7 +97,7 @@ void Text::OnKey(GLFWwindow * window, int key, int action, int mods)
             glfwSetClipboardString(window, ct.c_str());
             RemoveSelection();
         }
-        return;
+        return true;
     }
 
     if(mods & GLFW_MOD_CONTROL && key == GLFW_KEY_V)
@@ -107,43 +107,45 @@ void Text::OnKey(GLFWwindow * window, int key, int action, int mods)
             RemoveSelection();
             Insert(ct);
         }
-        return;
+        return true;
     }
                     
     switch(key)
     {
     case GLFW_KEY_LEFT:
         if(cursor > 0) MoveSelectionCursor(utf8::prev(GetFocusText() + cursor) - GetFocusText(), (mods & GLFW_MOD_SHIFT) != 0);
-        break;
+        return true;
     case GLFW_KEY_RIGHT: 
         if(cursor < GetFocusTextSize()) MoveSelectionCursor(cursor = utf8::next(GetFocusText() + cursor) - GetFocusText(), (mods & GLFW_MOD_SHIFT) != 0);
-        break;
+        return true;
     case GLFW_KEY_HOME:
         if(cursor > 0) MoveSelectionCursor(0, (mods & GLFW_MOD_SHIFT) != 0);
-        break;
+        return true;
     case GLFW_KEY_END: 
         if(cursor < GetFocusTextSize()) MoveSelectionCursor(GetFocusTextSize(), (mods & GLFW_MOD_SHIFT) != 0);
-        break;
+        return true;
     case GLFW_KEY_BACKSPACE: 
         if(isSelecting) RemoveSelection();
-        else if(isEditable && cursor > 0)
+        else if(cursor > 0)
         {
             int prev = utf8::prev(GetFocusText() + cursor) - GetFocusText();
             text.erase(prev, cursor - prev);
             cursor = prev;
             if(onEdit) onEdit(text);
         }
-        break;
+        return true;
     case GLFW_KEY_DELETE:
         if(isSelecting) RemoveSelection();
-        else if(isEditable && cursor < GetFocusTextSize())
+        else if(cursor < GetFocusTextSize())
         {
             auto next = utf8::next(GetFocusText() + cursor) - GetFocusText();
             text.erase(cursor, next - cursor);
             if(onEdit) onEdit(text);
         }
-        break;
+        return true;
     }
+
+    return false;
 }
 
 gui::DraggerPtr Text::OnClick(const gui::MouseEvent & e)
@@ -409,12 +411,35 @@ class MenuButton : public gui::Element
     std::function<void()> func;
     bool isPopup;
 public:
-    MenuButton(const Font & font, const std::string & label, int offset, std::function<void()> func, bool isPopup) : func(func), isPopup(isPopup)
+    MenuButton(const Font & font, const MenuItem & item, int offset, std::function<void()> func, bool isPopup) : func(func), isPopup(isPopup)
     {
         auto text = std::make_shared<Text>(font);
         text->isTransparent = true;
-        text->text = label;
+        text->text = item.label;
         children.push_back({{{0,offset},{0,2},{1,-offset},{1,-2}}, text});
+
+        if(item.hotKey)
+        {
+            std::ostringstream ss;
+            if(item.hotKeyMods & GLFW_MOD_CONTROL) ss << "Ctrl+";
+            if(item.hotKeyMods & GLFW_MOD_SHIFT) ss << "Shift+";
+            if(item.hotKeyMods & GLFW_MOD_ALT) ss << "Alt+";
+            if(item.hotKeyMods & GLFW_MOD_SUPER) ss << "Super+";
+            if(item.hotKey >= GLFW_KEY_A && item.hotKey <= GLFW_KEY_Z) ss << static_cast<char>('A' + item.hotKey - GLFW_KEY_A);
+            else if(item.hotKey >= GLFW_KEY_0 && item.hotKey <= GLFW_KEY_9) ss << (item.hotKey - GLFW_KEY_0);
+            else if(item.hotKey >= GLFW_KEY_F1 && item.hotKey <= GLFW_KEY_F12) ss << 'F' << (1 + item.hotKey - GLFW_KEY_F1);
+            else switch(item.hotKey)
+            {
+            case GLFW_KEY_INSERT: ss << "Ins"; break;
+            case GLFW_KEY_DELETE: ss << "Del"; break;
+            default: throw std::runtime_error("Unsupported key!"); // TODO: Implement all keys
+            }           
+
+            text = std::make_shared<Text>(font);
+            text->isTransparent = true;
+            text->text = ss.str();
+            children.push_back({{{1,-font.GetStringWidth(text->text)-offset},{0,2},{1,-offset},{1,-2}}, text});
+        }
     }
 
     gui::DraggerPtr OnClick(const gui::MouseEvent & e) { func(); return {}; }
@@ -467,7 +492,7 @@ std::weak_ptr<gui::Element> Menu::MakePopup(size_t level, const Font & font, con
         auto func = item.onClick;
         if(!item.children.empty())
         {
-            auto childPopup = MakePopup(level + 1, font, item.children, x+98, y+placement.y0.b);
+            auto childPopup = MakePopup(level + 1, font, item.children, x+150-2, y+placement.y0.b);
             func = [bar,childPopup,level]() { if(auto pop = childPopup.lock()) bar->ShowPopup(level, pop); };
         }
         else
@@ -475,12 +500,12 @@ std::weak_ptr<gui::Element> Menu::MakePopup(size_t level, const Font & font, con
             auto f = item.onClick;
             func = [bar,f]() { bar->HidePopups(); f(); };
         }
-        popup->AddChild(placement, std::make_shared<MenuButton>(font, item.label, 10, func, !item.children.empty()));
+        popup->AddChild(placement, std::make_shared<MenuButton>(font, item, 10, func, !item.children.empty()));
     }
 
     popup = std::make_shared<Border>(1, 0.5f, 1.0f, 0, nvgRGBA(0,0,0,255), nvgRGBA(64,64,64,255), popup);
 
-    AddChild({{0,x}, {0,y}, {0,x+100}, {0,y+placement.y1.b+2}}, popup);
+    AddChild({{0,x}, {0,y}, {0,x+150}, {0,y+placement.y1.b+2}}, popup);
     popup->isVisible = false;
     return popup;
 }
@@ -512,7 +537,7 @@ Menu::Menu(gui::ElementPtr inner, const Font & font, const std::vector<MenuItem>
             func = [bar,f]() { bar->HidePopups(); f(); };
         }
 
-        AddChild(placement, std::make_shared<MenuButton>(font, item.label, 10, func, false));
+        AddChild(placement, std::make_shared<MenuButton>(font, item, 10, func, false));
     }
 
     std::reverse(children.begin()+3, children.end());

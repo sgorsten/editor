@@ -1,4 +1,5 @@
 #include "window.h"
+#include "widgets.h"
 #include "engine/gl.h"
 
 #include "nanovg.h"
@@ -215,7 +216,20 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
         }
 
         if(w->dragger && w->dragger->OnKey(key, action, mods)) return; // If one is present, a dragger can consume keystrokes
-        if(w->focus) w->focus->OnKey(window, key, action, mods); // All remaining keys apply to current "focus" element
+        if(w->focus && w->focus->OnKey(window, key, action, mods)) return; // If an element is focused, it can consume keystrokes
+
+        // Remaining keys can be consumed by global shortcuts
+        if(action == GLFW_PRESS)
+        {
+            for(auto & shortcut : w->shortcuts)
+            {
+                if(key == shortcut.key && mods == shortcut.mods)
+                {
+                    shortcut.onInvoke();
+                    return;
+                }
+            }
+        }
     });
 }
 
@@ -240,9 +254,17 @@ void Window::RefreshLayout()
     CollectTabStops(tabStops, root);
 }
 
-void Window::SetGuiRoot(gui::ElementPtr element)
+void Window::GatherShortcuts(const MenuItem & item)
 {
-    root = element; 
+    if(item.hotKey) shortcuts.push_back({item.hotKeyMods, item.hotKey, item.onClick});
+    for(auto & child : item.children) GatherShortcuts(child);
+}
+
+void Window::SetGuiRoot(gui::ElementPtr element, const Font & menuFont, const std::vector<MenuItem> & menuItems)
+{
+    shortcuts.clear();
+    for(auto & item : menuItems) GatherShortcuts(item);
+    root = std::make_shared<Menu>(element, menuFont, menuItems);
     RefreshLayout();
 }
 

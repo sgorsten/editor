@@ -78,6 +78,12 @@ struct Scene
         objects.push_back(obj);
         return obj;    
     }
+
+    void DeleteObject(std::shared_ptr<Object> object)
+    {
+        auto it = std::find(begin(objects), end(objects), object);
+        if(it != end(objects)) objects.erase(it);
+    }
 };
 
 

@@ -99,7 +99,7 @@ namespace gui
         virtual void                                        OnDrawForeground(const DrawEvent & e) const {} // Draw contents after children
 
         virtual void                                        OnChar(uint32_t codepoint) {}
-        virtual void                                        OnKey(GLFWwindow * window, int key, int action, int mods) {}
+        virtual bool                                        OnKey(GLFWwindow * window, int key, int action, int mods) { return false; }
         virtual DraggerPtr                                  OnClick(const MouseEvent & e) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
         virtual void                                        OnTab() {}
     };

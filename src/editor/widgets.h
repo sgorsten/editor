@@ -41,7 +41,7 @@ public:
     gui::Cursor GetCursor() const override { return isEditable ? gui::Cursor::IBeam : gui::Cursor::Arrow; }
 
     void OnChar(uint32_t codepoint) override;
-    void OnKey(GLFWwindow * window, int key, int action, int mods) override;
+    bool OnKey(GLFWwindow * window, int key, int action, int mods) override;
     gui::DraggerPtr OnClick(const gui::MouseEvent & e) override;
     void OnTab() override { SelectAll(); }
     NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
@@ -95,10 +95,10 @@ struct MenuItem
     std::string label;              // The string that should be displayed for this item
     std::vector<MenuItem> children; // If nonempty, clicking on this item will open a popup menu
     std::function<void()> onClick;  // If bound, clicking on this item will invoke this function
+    int hotKeyMods, hotKey;
 
-    MenuItem() : isEnabled(true) {}
-    MenuItem(const std::string & label) : isEnabled(true), label(label) {}
-    MenuItem(const std::string & label, std::function<void()> onClick) : isEnabled(true), label(label), onClick(onClick) {}
+    MenuItem() : isEnabled(true), hotKeyMods(), hotKey() {}
+    MenuItem(const std::string & label, std::function<void()> onClick, int hotKeyMods=0, int hotKey=0) : isEnabled(true), label(label), onClick(onClick), hotKeyMods(hotKeyMods), hotKey(hotKey) {}
 
     static MenuItem Popup(std::string label, std::vector<MenuItem> children) { auto r = MenuItem(); r.label = move(label); r.children = move(children); return r; }
 };

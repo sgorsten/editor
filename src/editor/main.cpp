@@ -121,11 +121,6 @@ struct View : public gui::Element
         pitch -= delta.y * 0.01f;
         viewpoint.orientation = qmul(RotationQuaternion({0,1,0}, yaw), RotationQuaternion({1,0,0}, pitch));
     }
-    
-    void OnKey(GLFWwindow * window, int key, int action, int mods) override
-    {
-        
-    }
 
     NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override
     {
@@ -156,35 +151,32 @@ struct View : public gui::Element
             obj->prog = prog;
             glPopAttrib();
 
-            if(e.hasFocus)
-            {
-                glClear(GL_DEPTH_BUFFER_BIT);
-                auto model = TranslationMatrix(obj->position);
-                auto mvp = mul(viewProj, model);
-                glUseProgram(selection.arrowProg);
-                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_eye"), 1, &viewpoint.position.x);
-                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.1f, 0.1f, 0.5f);
-                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.1f, 0.1f, 0.5f);
-                selection.arrowMesh.Draw();
+            glClear(GL_DEPTH_BUFFER_BIT);
+            auto model = TranslationMatrix(obj->position);
+            auto mvp = mul(viewProj, model);
+            glUseProgram(selection.arrowProg);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+            glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_eye"), 1, &viewpoint.position.x);
+            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.1f, 0.1f, 0.5f);
+            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.1f, 0.1f, 0.5f);
+            selection.arrowMesh.Draw();
 
-                model = Pose(obj->position, RotationQuaternion({1,0,0},-1.57f)).Matrix();
-                mvp = mul(viewProj, model);
-                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.1f, 0.5f, 0.1f);
-                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.1f, 0.5f, 0.1f);
-                selection.arrowMesh.Draw();
+            model = Pose(obj->position, RotationQuaternion({1,0,0},-1.57f)).Matrix();
+            mvp = mul(viewProj, model);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.1f, 0.5f, 0.1f);
+            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.1f, 0.5f, 0.1f);
+            selection.arrowMesh.Draw();
 
-                model = Pose(obj->position, RotationQuaternion({0,1,0},+1.57f)).Matrix();
-                mvp = mul(viewProj, model);
-                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.5f, 0.1f, 0.1f);
-                glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.5f, 0.1f, 0.1f);
-                selection.arrowMesh.Draw();
-            }
+            model = Pose(obj->position, RotationQuaternion({0,1,0},+1.57f)).Matrix();
+            mvp = mul(viewProj, model);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.5f, 0.1f, 0.1f);
+            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.5f, 0.1f, 0.1f);
+            selection.arrowMesh.Draw();
         }
 
         glPopAttrib();
@@ -382,43 +374,6 @@ void main()
         auto rightPanel = std::make_shared<Splitter>(bottomRightPanel, topRightPanel, Splitter::Top, 200);
         auto mainPanel = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
         
-        auto guiRoot = std::make_shared<Menu>(mainPanel, font, std::vector<MenuItem>{
-            MenuItem::Popup("File", {
-                {"New", [](){}},
-                MenuItem::Popup("Open", {
-                    {"Game", [](){}},
-                    {"Level", [](){}}
-                }),
-                {"Save", [](){}},
-                {"Exit", [this]() { quit = true; }}
-            }),
-            MenuItem::Popup("Edit", {
-                {"Cut",   [](){}},
-                {"Copy",  [](){}},
-                {"Paste", [](){}}
-            }),
-            MenuItem::Popup("Object", {
-                {"New", [this,prog]() { 
-                    scene.CreateObject("New Object", {0,0,0}, &mesh, prog, {1,1,1}, {0,0,0});
-                    RefreshObjectList();
-                }},
-                {"Duplicate", [this]() { 
-                    auto obj = scene.DuplicateObject(*selection.object.lock());
-                    RefreshObjectList();
-                    selection.SetSelection(obj);
-                }},
-                {"Delete", [this]() { 
-                    auto obj = selection.object.lock();
-                    auto it = std::find(begin(scene.objects), end(scene.objects), obj);
-                    if(it != end(scene.objects))
-                    {
-                        scene.objects.erase(it);
-                        RefreshObjectList();
-                    }
-                }}
-            })
-        });
-
         RefreshObjectList();
             
         selection.onSelectionChanged = [this]()
@@ -429,7 +384,37 @@ void main()
         };
         selection.onSelectionChanged();
 
-        window.SetGuiRoot(guiRoot);
+        window.SetGuiRoot(mainPanel, font, std::vector<MenuItem>{
+            MenuItem::Popup("File", {
+                {"New", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_N},
+                MenuItem::Popup("Open", {
+                    {"Game", [](){}},
+                    {"Level", [](){}}
+                }),
+                {"Save", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_S},
+                {"Exit", [this]() { quit = true; }, GLFW_MOD_ALT, GLFW_KEY_F4}
+            }),
+            MenuItem::Popup("Edit", {
+                {"Cut",   [](){}, GLFW_MOD_CONTROL, GLFW_KEY_X},
+                {"Copy",  [](){}, GLFW_MOD_CONTROL, GLFW_KEY_C},
+                {"Paste", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_V}
+            }),
+            MenuItem::Popup("Object", {
+                {"New", [this,prog]() { 
+                    scene.CreateObject("New Object", {0,0,0}, &mesh, prog, {1,1,1}, {0,0,0});
+                    RefreshObjectList();
+                }},
+                {"Duplicate", [this]() { 
+                    auto obj = scene.DuplicateObject(*selection.object.lock());
+                    RefreshObjectList();
+                    selection.SetSelection(obj);
+                }, GLFW_MOD_CONTROL, GLFW_KEY_D},
+                {"Delete", [this]() { 
+                    scene.DeleteObject(selection.object.lock());
+                    RefreshObjectList();
+                }, 0, GLFW_KEY_DELETE}
+            })
+        });
     }
 
     int Run()
