@@ -2,16 +2,31 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\..\src\editor\main.cpp" />
-    <ClCompile Include="..\..\src\editor\gui.cpp" />
     <ClCompile Include="..\..\src\editor\window.cpp" />
-    <ClCompile Include="..\..\src\editor\widgets.cpp" />
+    <ClCompile Include="..\..\src\editor\gui.cpp">
+      <Filter>gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\editor\widgets.cpp">
+      <Filter>gui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\editor\scene.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\editor\gui.h" />
     <ClInclude Include="..\..\src\editor\window.h" />
-    <ClInclude Include="..\..\src\editor\widgets.h" />
+    <ClInclude Include="..\..\src\editor\gui.h">
+      <Filter>gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor\widgets.h">
+      <Filter>gui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\editor\scene.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="gui">
+      <UniqueIdentifier>{7939bdf6-7f5c-43e5-bdef-5a43ee8582bd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

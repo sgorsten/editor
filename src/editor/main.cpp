@@ -7,95 +7,10 @@
 #include "engine/geometry.h"
 
 #include "nanovg.h"
+#include "scene.h"
 
-#include <vector>
 #include <algorithm>
 #include <sstream>
-
-struct Vertex
-{
-    float3 position, normal;
-};
-
-struct Mesh
-{
-    std::vector<Vertex> vertices;
-    std::vector<uint3> triangles;
-    gl::Mesh glMesh;
-
-    Mesh() {}
-    Mesh(Mesh && m) : Mesh() { *this = std::move(m); }
-    Mesh & operator = (Mesh && m) { vertices=move(m.vertices); triangles=move(m.triangles); glMesh=std::move(m.glMesh); return *this; }
-
-    RayMeshHit Hit(const Ray & ray) const { return IntersectRayMesh(ray, vertices.data(), &Vertex::position, triangles.data(), triangles.size()); }
-
-    void Upload()
-    {       
-        glMesh.SetVertices(vertices);
-        glMesh.SetAttribute(0, &Vertex::position);
-        glMesh.SetAttribute(1, &Vertex::normal);
-        glMesh.SetElements(triangles);
-    }
-
-    void Draw()
-    {
-        glMesh.Draw();
-    }
-};
-
-struct Object
-{
-    std::string name;
-    float3 position;
-    float3 color;
-    Mesh * mesh;
-    GLuint prog;
-
-    RayMeshHit Hit(const Ray & ray) const
-    {
-        return mesh->Hit({ray.start-position,ray.direction});
-    }
-
-    void Draw(const float4x4 & viewProj, const float3 & eye, const float3 & lightPos)
-    {
-        auto model = TranslationMatrix(position);
-        auto mvp = mul(viewProj, model);
-        glUseProgram(prog);
-        glUniformMatrix4fv(glGetUniformLocation(prog, "u_model"), 1, GL_FALSE, &model.x.x);
-        glUniformMatrix4fv(glGetUniformLocation(prog, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-        glUniform3fv(glGetUniformLocation(prog, "u_eye"), 1, &eye.x);
-        glUniform3fv(glGetUniformLocation(prog, "u_color"), 1, &color.x);
-        glUniform3fv(glGetUniformLocation(prog, "u_lightPos"), 1, &lightPos.x);
-        mesh->Draw();
-    }
-};
-
-struct Scene
-{
-    std::vector<Object> objects;
-
-    Object * Hit(const Ray & ray)
-    {
-        Object * best = nullptr;
-        float bestT = 0;
-        for(auto & obj : objects)
-        {
-            auto hit = obj.Hit(ray);
-            if(hit.hit && (!best || hit.t < bestT))
-            {
-                best = &obj;
-                bestT = hit.t;
-            }
-        }
-        return best;
-    }
-
-    void Draw(const float4x4 & viewProj, const float3 & eye)
-    {
-        auto lightPos = objects.back().position;
-        for(auto & obj : objects) obj.Draw(viewProj, eye, lightPos);
-    }
-};
 
 struct Selection
 {
@@ -343,6 +258,7 @@ class Editor
     Font                    font;
     GuiFactory              factory;
     std::shared_ptr<ListBox>objectList;
+    gui::ElementPtr         objectListPanel;
     gui::ElementPtr         propertyPanel;
     gui::ElementPtr         guiRoot;
     Mesh                    mesh,ground,bulb;
@@ -352,6 +268,36 @@ class Editor
     std::shared_ptr<View>   view;
 
     bool                    quit;
+
+    void RefreshObjectList()
+    {
+        // TODO: Back up and restore selection
+        objectList = std::make_shared<ListBox>(font, 2);
+        for(auto & obj : scene.objects) objectList->AddItem(obj.name);
+        objectList->onSelectionChanged = [this]() { selection.SetSelection(&scene.objects[objectList->GetSelectedIndex()]); };
+        objectListPanel->children = {{{{0,0},{0,0},{1,0},{1,0}}, objectList}};
+        RefreshPropertyPanel();
+    }
+
+    void RefreshPropertyPanel()
+    {
+        std::vector<std::pair<std::string, gui::ElementPtr>> props;
+        if(selection.object)
+        {
+            auto & obj = *selection.object;
+            props.push_back({"Name", factory.MakeEdit(obj.name, [this](const std::string & text)
+            {
+                int selectedIndex = objectList->GetSelectedIndex();
+                scene.objects[selectedIndex].name = text;
+                objectList->SetItemText(selectedIndex, text);
+            })});
+            props.push_back({"Position", factory.MakeVectorEdit(obj.position)});
+            props.push_back({"Color", factory.MakeVectorEdit(obj.color)});
+            props.push_back({"Light Color", factory.MakeVectorEdit(obj.lightColor)});
+        }
+        propertyPanel->children = {{{{0,0},{0,0},{1,0},{1,0}}, factory.MakePropertyMap(props)}};
+        window.RefreshLayout();
+    }
 public:
     Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), quit()
     {
@@ -373,20 +319,28 @@ void main()
 )");
 
         auto fs = gl::CompileShader(GL_FRAGMENT_SHADER, R"(#version 330
-uniform vec3 u_lightPos;
+struct PointLight
+{
+    vec3 position;
+    vec3 color;
+};
+uniform PointLight u_lights[8];
 uniform vec3 u_eye;
 uniform vec3 u_color;
 in vec3 position;
 in vec3 normal;
 void main()
 {
-    vec3 lightDir = normalize(u_lightPos - position);
     vec3 eyeDir = normalize(u_eye - position);
-    vec3 halfDir = normalize(lightDir + eyeDir);
+    vec3 light = vec3(0,0,0);
+    for(int i=0; i<8; ++i)
+    {
+        vec3 lightDir = normalize(u_lights[i].position - position);
+        light += u_lights[i].color * max(dot(normal, lightDir), 0);
 
-    float light = 0.3;
-    light += max(dot(normal, lightDir), 0);
-    light += pow(max(dot(normal, halfDir), 0), 128);
+        vec3 halfDir = normalize(lightDir + eyeDir);
+        light += u_lights[i].color * pow(max(dot(normal, halfDir), 0), 128);
+    }
     gl_FragColor = vec4(u_color*light,1);
 }
 )");
@@ -415,18 +369,13 @@ void main()
             {"Alpha",{-0.6f,0.5f,0},{1,0,0},&mesh,prog},
             {"Beta", {+0.6f,0.5f,0},{0,1,0},&mesh,prog},
             {"Gamma",{ 0.0f,1.5f,0},{1,1,0},&mesh,prog},
-            {"Light",{ 0.0f,3.0f,1.0},{1,1,1},&bulb,prog},
+            {"Light",{ 0.0f,3.0f,1.0},{1,1,1},&bulb,prog,{1,1,1}},
         };
         view->viewpoint.position = {0,1,4};
 
-        objectList = std::make_shared<ListBox>(font, 2);
-        for(auto & obj : scene.objects)
-        {
-            objectList->AddItem(obj.name);
-        }
-
+        objectListPanel = std::make_shared<gui::Element>();
         propertyPanel = std::make_shared<gui::Element>();
-        auto topRightPanel = Border::CreateBigBorder(objectList);
+        auto topRightPanel = Border::CreateBigBorder(objectListPanel);
         auto bottomRightPanel = Border::CreateBigBorder(propertyPanel);
         auto rightPanel = std::make_shared<Splitter>(bottomRightPanel, topRightPanel, Splitter::Top, 200);
         auto mainPanel = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
@@ -445,32 +394,23 @@ void main()
                 {"Cut",   [](){}},
                 {"Copy",  [](){}},
                 {"Paste", [](){}}
+            }),
+            MenuItem::Popup("Object", {
+                {"New", [this,prog]() { 
+                    scene.objects.push_back({"New Object",{0,0,0},{1,1,1},&mesh,prog}); 
+                    selection.object = nullptr;
+                    RefreshObjectList();
+                }}
             })
         });
-    
+
+        RefreshObjectList();
+            
         selection.onSelectionChanged = [this]()
         {
             objectList->SetSelectedIndex(selection.object ? selection.object - scene.objects.data() : -1);
-
-            std::vector<std::pair<std::string, gui::ElementPtr>> props;
-            if(selection.object)
-            {
-                auto & obj = *selection.object;
-                props.push_back({"Name", factory.MakeEdit(obj.name, [this](const std::string & text)
-                {
-                    int selectedIndex = objectList->GetSelectedIndex();
-                    scene.objects[selectedIndex].name = text;
-                    objectList->SetItemText(selectedIndex, text);
-                })});
-                props.push_back({"Position", factory.MakeVectorEdit(obj.position)});
-                props.push_back({"Color", factory.MakeVectorEdit(obj.color)});
-            }
-            propertyPanel->children = {{{{0,0},{0,0},{1,0},{1,0}}, factory.MakePropertyMap(props)}};
-
-            window.RefreshLayout();
+            RefreshPropertyPanel();
         };
-        objectList->onSelectionChanged = [this]() { selection.SetSelection(&scene.objects[objectList->GetSelectedIndex()]); };
-
         selection.onSelectionChanged();
 
         window.SetGuiRoot(guiRoot);

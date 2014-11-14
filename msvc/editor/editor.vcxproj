@@ -175,11 +175,13 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\editor\gui.cpp" />
     <ClCompile Include="..\..\src\editor\main.cpp" />
+    <ClCompile Include="..\..\src\editor\scene.cpp" />
     <ClCompile Include="..\..\src\editor\widgets.cpp" />
     <ClCompile Include="..\..\src\editor\window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor\gui.h" />
+    <ClInclude Include="..\..\src\editor\scene.h" />
     <ClInclude Include="..\..\src\editor\widgets.h" />
     <ClInclude Include="..\..\src\editor\window.h" />
   </ItemGroup>

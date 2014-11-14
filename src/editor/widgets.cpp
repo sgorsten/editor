@@ -369,6 +369,10 @@ void Border::OnDrawForeground(const gui::DrawEvent & e) const
 std::shared_ptr<Border> Border::CreateBigBorder(gui::ElementPtr inner) { return std::make_shared<Border>(4, 1.5f, 2.0f, 4.5f, nvgRGBA(0,0,0,192), nvgRGBA(64,64,64,255), inner); }
 std::shared_ptr<Border> Border::CreateEditBorder(gui::ElementPtr inner) { return std::make_shared<Border>(2, 0.5f, 1.0f, 2.5f, nvgRGBA(0,0,0,128), nvgRGBA(88,88,88,255), inner); }
 
+//////////
+// Menu //
+//////////
+
 class Menu::Barrier : public gui::Element
 {
     std::vector<gui::ElementPtr> popups;
