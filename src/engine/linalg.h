@@ -76,6 +76,7 @@ template<class T, int M> T          mag2  (const vec<T,M> & a)                  
 template<class T, int M> vec<T,M>   max   (const vec<T,M> & a, const vec<T,M> & b)      { return a.apply(b, std::max<T>); }
 template<class T, int M> vec<T,M>   min   (const vec<T,M> & a, const vec<T,M> & b)      { return a.apply(b, std::min<T>); }
 template<class T, int M> vec<T,M>   norm  (const vec<T,M> & a)                          { return a/mag(a); }
+template<class T, int M> vec<T,M>   normz (const vec<T,M> & a)                          { auto m = mag(a); return m ? a/m : vec<T,M>(); }
 
 template<class T>        vec<T,4>   qconj (const vec<T,4> & q)                          { return {-q.x,-q.y,-q.z,q.w}; }
 template<class T>        vec<T,4>   qinv  (const vec<T,4> & q)                          { return qconj(q)/mag2(q); }

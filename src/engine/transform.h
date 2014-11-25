@@ -6,7 +6,9 @@
 inline float3 TransformDirection(const float4x4 & transformMatrix, const float3 & direction) { return mul(transformMatrix, float4(direction,0)).xyz(); } // Works for rigid transforms only
 inline float3 TransformCoordinate(const float4x4 & transformMatrix, const float3 & coordinate) { auto r = mul(transformMatrix, float4(coordinate,1)); return r.xyz() / r.w; }
 
-float4 RotationQuaternion(const float3 & axisOfRotation, float angleInRadians);
+float4 RotationQuaternionAxisAngle(const float3 & axisOfRotation, float angleInRadians);
+float4 RotationQuaternionFromToVec(const float3 & fromVector, const float3 & toVector);
+
 float4x4 TranslationMatrix(const float3 & translationVec);
 float4x4 RigidTransformationMatrix(const float4 & rotationQuat, const float3 & translationVec);
 float4x4 PerspectiveMatrixRhGl(float verticalFieldOfViewInRadians, float aspectRatioWidthOverHeight, float nearClipDistance, float farClipDistance);

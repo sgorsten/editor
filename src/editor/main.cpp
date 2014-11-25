@@ -81,29 +81,18 @@ class AxisRotationDragger : public gui::IDragger
 
     float3 ComputeEdge(const int2 & mouse) const
     {
-        float d = dot(axis, object.pose.position);
         auto ray = caster.ComputeRay(mouse);
-        auto denom = dot(axis, ray.direction);
-        auto t = (d - dot(axis, ray.start)) / denom;
-        return norm((ray.start + ray.direction * t) - object.pose.position);
+        auto hit = IntersectRayPlane(ray, Plane(axis, object.pose.position));
+        return ray.GetPoint(hit.t) - object.pose.position;
     }
 public:
     AxisRotationDragger(Object & object, const Raycaster & caster, const float3 & axis, const int2 & click) : object(object), caster(caster), axis(axis), initialOrientation(object.pose.orientation), edge1(ComputeEdge(click)) {}
 
-    void OnDrag(int2 newMouse) override
-    {
-        auto edge2 = ComputeEdge(newMouse);
-        auto axis = norm(cross(edge1, edge2));
-        auto angle = std::acos(dot(edge1, edge2));
-        object.pose.orientation = qmul(RotationQuaternion(axis, angle), initialOrientation);
-    }
-
+    void OnDrag(int2 newMouse) override { object.pose.orientation = qmul(RotationQuaternionFromToVec(edge1, ComputeEdge(newMouse)), initialOrientation); }
     void OnRelease() override {}
     void OnCancel() override { object.pose.orientation = initialOrientation; }
 };
 
-struct GizmoPart { float4 orientation; float3 axis; };
-const GizmoPart gizmoParts[] = { {{0,0,0,1}, {0,0,1}}, {RotationQuaternion({1,0,0},-1.57f), {0,1,0}}, {RotationQuaternion({0,1,0},+1.57f), {1,0,0}} };
 struct View : public gui::Element
 {
     class MouselookDragger : public gui::IDragger
@@ -176,7 +165,7 @@ struct View : public gui::Element
     {
         yaw -= delta.x * 0.01f;
         pitch -= delta.y * 0.01f;
-        viewpoint.orientation = qmul(RotationQuaternion({0,1,0}, yaw), RotationQuaternion({1,0,0}, pitch));
+        viewpoint.orientation = qmul(RotationQuaternionAxisAngle({0,1,0}, yaw), RotationQuaternionAxisAngle({1,0,0}, pitch));
     }
 
     NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override
@@ -209,10 +198,10 @@ struct View : public gui::Element
             glPopAttrib();
 
             glClear(GL_DEPTH_BUFFER_BIT);
-            for(auto & part : gizmoParts)
+            for(auto & axis : {float3(1,0,0), float3(0,1,0), float3(0,0,1)})
             {
-                auto model = (obj->pose * Pose({0,0,0}, part.orientation)).Matrix(), mvp = mul(viewProj, model);
-                auto color = part.axis * 0.4f + 0.1f;
+                auto model = (obj->pose * Pose({0,0,0}, RotationQuaternionFromToVec({0,0,1}, axis))).Matrix(), mvp = mul(viewProj, model);
+                auto color = axis * 0.4f + 0.1f;
                 glUseProgram(selection.arrowProg);
                 glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
                 glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
@@ -262,13 +251,13 @@ struct View : public gui::Element
             if(auto obj = selection.object.lock())
             {
                 gui::DraggerPtr best; float bestT;
-                for(auto & part : gizmoParts)
+                for(auto & axis : {float3(1,0,0), float3(0,1,0), float3(0,0,1)})
                 {
-                    auto localRay = (obj->pose * Pose({0,0,0}, part.orientation)).Inverse() * ray;
+                    auto localRay = (obj->pose * Pose({0,0,0}, RotationQuaternionFromToVec({0,0,1}, axis))).Inverse() * ray;
                     auto hit = GetGizmoMesh().Hit(localRay);
                     if(hit.hit && (!best || hit.t < bestT))
                     {
-                        best = CreateGizmoDragger(*obj, caster, qrot(obj->pose.orientation, part.axis), e.cursor);
+                        best = CreateGizmoDragger(*obj, caster, qrot(obj->pose.orientation, axis), e.cursor);
                         bestT = hit.t;
                     }                    
                 }
@@ -342,6 +331,7 @@ class Editor
                 objectList->SetItemText(selectedIndex, text);
             })});
             props.push_back({"Position", factory.MakeVectorEdit(obj->pose.position)});
+            props.push_back({"Orientation", factory.MakeVectorEdit(obj->pose.orientation)});
             props.push_back({"Diffuse Color", factory.MakeVectorEdit(obj->color)});
             props.push_back({"Emissive Color", factory.MakeVectorEdit(obj->lightColor)});
         }
@@ -409,10 +399,10 @@ void main()
         selection.arrowMesh.Upload();
         selection.arrowProg = prog;
 
-        selection.circleMesh.AddCylinder({0,0,-0.02f}, 0.80f, {0,0,-0.02f}, 1.00f, {1,0,0}, {0,1,0}, 32);
+        selection.circleMesh.AddCylinder({0,0,-0.02f}, 0.90f, {0,0,-0.02f}, 1.00f, {1,0,0}, {0,1,0}, 32);
         selection.circleMesh.AddCylinder({0,0,-0.02f}, 1.00f, {0,0,+0.02f}, 1.00f, {1,0,0}, {0,1,0}, 32);
-        selection.circleMesh.AddCylinder({0,0,+0.02f}, 1.00f, {0,0,+0.02f}, 0.80f, {1,0,0}, {0,1,0}, 32);
-        selection.circleMesh.AddCylinder({0,0,+0.02f}, 0.80f, {0,0,-0.02f}, 0.80f, {1,0,0}, {0,1,0}, 32);
+        selection.circleMesh.AddCylinder({0,0,+0.02f}, 1.00f, {0,0,+0.02f}, 0.90f, {1,0,0}, {0,1,0}, 32);
+        selection.circleMesh.AddCylinder({0,0,+0.02f}, 0.90f, {0,0,-0.02f}, 0.90f, {1,0,0}, {0,1,0}, 32);
         selection.circleMesh.ComputeNormals();
         selection.circleMesh.Upload();
 

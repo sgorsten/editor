@@ -1,8 +1,14 @@
 #include "transform.h"
 
-float4 RotationQuaternion(const float3 & axisOfRotation, float angleInRadians)
+float4 RotationQuaternionAxisAngle(const float3 & axisOfRotation, float angleInRadians)
 {
     return {axisOfRotation * std::sin(angleInRadians/2), std::cos(angleInRadians/2)};
+}
+
+float4 RotationQuaternionFromToVec(const float3 & fromVector, const float3 & toVector)
+{
+    auto a = norm(fromVector), b = norm(toVector);
+    return RotationQuaternionAxisAngle(normz(cross(a,b)), std::acos(dot(a,b)));
 }
 
 float4x4 TranslationMatrix(const float3 & translation)

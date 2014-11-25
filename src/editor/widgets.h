@@ -170,6 +170,15 @@ public:
         panel->children.push_back({{{2.0f/3,+spacing*2.0f/3},{0,0},{3.0f/3, 0},{1,0}},MakeFloatEdit(value.z)});
         return panel;
     }
+    gui::ElementPtr MakeVectorEdit(float4 & value) const
+    {
+        auto panel = std::make_shared<gui::Element>();
+        panel->children.push_back({{{0.0f/4, 0},{0,0},{1.0f/4,-spacing*3.0f/4},{1,0}},MakeFloatEdit(value.x)});
+        panel->children.push_back({{{1.0f/4,+spacing*1.0f/4},{0,0},{2.0f/4,-spacing*2.0f/4},{1,0}},MakeFloatEdit(value.y)});
+        panel->children.push_back({{{2.0f/4,+spacing*2.0f/4},{0,0},{3.0f/4,-spacing*1.0f/4},{1,0}},MakeFloatEdit(value.z)});
+        panel->children.push_back({{{3.0f/4,+spacing*3.0f/4},{0,0},{4.0f/4, 0},{1,0}},MakeFloatEdit(value.w)});
+        return panel;
+    }
 };
 
 #endif

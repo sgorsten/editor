@@ -1,5 +1,12 @@
 #include "geometry.h"
 
+RayPlaneHit IntersectRayPlane(const Ray & ray, const Plane & plane)
+{
+    auto denom = dot(ray.direction, plane.GetNormal());
+    if(std::abs(denom) < 0.0001f) return {false};
+    return {true, -(dot(ray.start, plane.GetNormal()) + plane.coeff.w) / denom};    
+}
+
 RayTriHit IntersectRayTriangle(const Ray & ray, const float3 & v0, const float3 & v1, const float3 & v2)
 {
     auto e1 = v1 - v0, e2 = v2 - v0, h = cross(ray.direction, e2);
