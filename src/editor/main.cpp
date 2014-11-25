@@ -71,7 +71,7 @@ class LinearTranslationDragger : public gui::IDragger
         return (dot(r12,ray1.direction) - dot(r12,ray2.direction)*e1e2) / denom;
     }
 public:
-    LinearTranslationDragger(Object & object, const Raycaster & caster, const float3 & direction, const int2 & click) : object(object), caster(caster), direction(direction), initialPosition(object.pose.position), initialS(ComputeS(click)) {}
+    LinearTranslationDragger(Object & object, const Raycaster & caster, const float3 & direction, const int2 & click) : object(object), caster(caster), direction(qrot(object.pose.orientation, direction)), initialPosition(object.pose.position), initialS(ComputeS(click)) {}
 
     void OnDrag(int2 newMouse) override { object.pose.position = initialPosition + direction * (ComputeS(newMouse) - initialS); }
     void OnRelease() override {}
@@ -92,11 +92,37 @@ class AxisRotationDragger : public gui::IDragger
         return ray.GetPoint(hit.t) - object.pose.position;
     }
 public:
-    AxisRotationDragger(Object & object, const Raycaster & caster, const float3 & axis, const int2 & click) : object(object), caster(caster), axis(axis), initialOrientation(object.pose.orientation), edge1(ComputeEdge(click)) {}
+    AxisRotationDragger(Object & object, const Raycaster & caster, const float3 & axis, const int2 & click) : object(object), caster(caster), axis(qrot(object.pose.orientation, axis)), initialOrientation(object.pose.orientation), edge1(ComputeEdge(click)) {}
 
     void OnDrag(int2 newMouse) override { object.pose.orientation = qmul(RotationQuaternionFromToVec(edge1, ComputeEdge(newMouse)), initialOrientation); }
     void OnRelease() override {}
     void OnCancel() override { object.pose.orientation = initialOrientation; }
+};
+
+class LinearScalingDragger : public gui::IDragger
+{
+    Object & object;
+    Raycaster caster;
+    float3 scaleDirection, direction, initialScale;
+    float initialS;
+
+    float ComputeS(const int2 & mouse) const
+    {
+        const Ray ray1 = {object.pose.position, direction}, ray2 = caster.ComputeRay(mouse);
+        const auto r12 = ray2.start - ray1.start;
+        const auto e1e2 = dot(ray1.direction, ray2.direction), denom = 1 - e1e2*e1e2;
+        return (dot(r12,ray1.direction) - dot(r12,ray2.direction)*e1e2) / denom;
+    }
+public:
+    LinearScalingDragger(Object & object, const Raycaster & caster, const float3 & direction, const int2 & click) : object(object), caster(caster), scaleDirection(direction), direction(qrot(object.pose.orientation, direction)), initialScale(object.localScale), initialS(ComputeS(click)) {}
+
+    void OnDrag(int2 newMouse) override 
+    { 
+        float scale = ComputeS(newMouse) / initialS;
+        object.localScale = initialScale + scaleDirection * ((scale - 1) * dot(initialScale, scaleDirection));
+    }
+    void OnRelease() override {}
+    void OnCancel() override { object.localScale = initialScale; }
 };
 
 struct View : public gui::Element
@@ -239,7 +265,7 @@ struct View : public gui::Element
         {
         case Translation: return std::make_shared<LinearTranslationDragger>(obj, caster, axis, cursor);
         case Rotation: return std::make_shared<AxisRotationDragger>(obj, caster, axis, cursor);
-        default: return std::make_shared<LinearTranslationDragger>(obj, caster, axis, cursor);
+        case Scaling: return std::make_shared<LinearScalingDragger>(obj, caster, axis, cursor);
         }
     }
 
@@ -264,7 +290,7 @@ struct View : public gui::Element
                     auto hit = GetGizmoMesh().Hit(localRay);
                     if(hit.hit && (!best || hit.t < bestT))
                     {
-                        best = CreateGizmoDragger(*obj, caster, qrot(obj->pose.orientation, axis), e.cursor);
+                        best = CreateGizmoDragger(*obj, caster, axis, e.cursor);
                         bestT = hit.t;
                     }                    
                 }
