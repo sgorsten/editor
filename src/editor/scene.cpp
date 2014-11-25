@@ -30,14 +30,14 @@ void Mesh::Upload()
     glMesh.SetElements(triangles);
 }
 
-void Mesh::Draw()
+void Mesh::Draw() const
 {
     glMesh.Draw();
 }
 
 void Object::Draw(const float4x4 & viewProj, const float3 & eye, const LightEnvironment & lights)
 {
-    auto model = TranslationMatrix(position);
+    auto model = pose.Matrix();
     auto mvp = mul(viewProj, model);
     glUseProgram(prog);
     glUniformMatrix4fv(glGetUniformLocation(prog, "u_model"), 1, GL_FALSE, &model.x.x);
@@ -68,6 +68,6 @@ std::shared_ptr<Object> Scene::Hit(const Ray & ray)
 void Scene::Draw(const float4x4 & viewProj, const float3 & eye)
 {
     LightEnvironment lights;
-    for(auto & obj : objects) if(mag2(obj->lightColor) > 0) lights.lights.push_back({obj->position, obj->lightColor});
+    for(auto & obj : objects) if(mag2(obj->lightColor) > 0) lights.lights.push_back({obj->pose.position, obj->lightColor});
     for(auto & obj : objects) obj->Draw(viewProj, eye, lights);
 }

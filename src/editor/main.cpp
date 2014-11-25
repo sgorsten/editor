@@ -17,7 +17,7 @@ struct Selection
     std::weak_ptr<Object> object;
     GLuint selectionProgram;
 
-    Mesh arrowMesh;
+    Mesh arrowMesh, circleMesh;
     GLuint arrowProg;
 
     Selection() : selectionProgram() {}
@@ -65,13 +65,45 @@ class LinearTranslationDragger : public gui::IDragger
         return (dot(r12,ray1.direction) - dot(r12,ray2.direction)*e1e2) / denom;
     }
 public:
-    LinearTranslationDragger(Object & object, const Raycaster & caster, const float3 & direction, const int2 & click) : object(object), caster(caster), direction(direction), initialPosition(object.position), initialS(ComputeS(click)) {}
+    LinearTranslationDragger(Object & object, const Raycaster & caster, const float3 & direction, const int2 & click) : object(object), caster(caster), direction(direction), initialPosition(object.pose.position), initialS(ComputeS(click)) {}
 
-    void OnDrag(int2 newMouse) override { object.position = initialPosition + direction * (ComputeS(newMouse) - initialS); }
+    void OnDrag(int2 newMouse) override { object.pose.position = initialPosition + direction * (ComputeS(newMouse) - initialS); }
     void OnRelease() override {}
-    void OnCancel() override { object.position = initialPosition; }
+    void OnCancel() override { object.pose.position = initialPosition; }
 };
 
+class AxisRotationDragger : public gui::IDragger
+{
+    Object & object;
+    Raycaster caster;
+    float3 axis, edge1;
+    float4 initialOrientation;
+
+    float3 ComputeEdge(const int2 & mouse) const
+    {
+        float d = dot(axis, object.pose.position);
+        auto ray = caster.ComputeRay(mouse);
+        auto denom = dot(axis, ray.direction);
+        auto t = (d - dot(axis, ray.start)) / denom;
+        return norm((ray.start + ray.direction * t) - object.pose.position);
+    }
+public:
+    AxisRotationDragger(Object & object, const Raycaster & caster, const float3 & axis, const int2 & click) : object(object), caster(caster), axis(axis), initialOrientation(object.pose.orientation), edge1(ComputeEdge(click)) {}
+
+    void OnDrag(int2 newMouse) override
+    {
+        auto edge2 = ComputeEdge(newMouse);
+        auto axis = norm(cross(edge1, edge2));
+        auto angle = std::acos(dot(edge1, edge2));
+        object.pose.orientation = qmul(RotationQuaternion(axis, angle), initialOrientation);
+    }
+
+    void OnRelease() override {}
+    void OnCancel() override { object.pose.orientation = initialOrientation; }
+};
+
+struct GizmoPart { float4 orientation; float3 axis; };
+const GizmoPart gizmoParts[] = { {{0,0,0,1}, {0,0,1}}, {RotationQuaternion({1,0,0},-1.57f), {0,1,0}}, {RotationQuaternion({0,1,0},+1.57f), {1,0,0}} };
 struct View : public gui::Element
 {
     class MouselookDragger : public gui::IDragger
@@ -97,13 +129,38 @@ struct View : public gui::Element
         void OnCancel() override {}
     };
 
+    enum Mode { Translation, Rotation, Scaling };
+
     Scene & scene;
     Selection & selection;
     Pose viewpoint;
     float yaw=0,pitch=0;
     bool bf=0,bl=0,bb=0,br=0;
+    Mode mode=Translation;
+
+    const Mesh & GetGizmoMesh() const
+    {
+        switch(mode)
+        {
+        case Translation: return selection.arrowMesh;
+        case Rotation: return selection.circleMesh;
+        default: return selection.arrowMesh;
+        }
+    }  
 
     View(Scene & scene, Selection & selection) : scene(scene), selection(selection) {}
+
+    bool OnKey(GLFWwindow * window, int key, int action, int mods) override
+    {
+        if(action != GLFW_PRESS) return false;
+        switch(key)
+        {
+        case GLFW_KEY_W: mode = Translation; return true;
+        case GLFW_KEY_E: mode = Rotation; return true;
+        case GLFW_KEY_R: mode = Scaling; return true;
+        default: return false;
+        }
+    }
 
     void OnUpdate(float timestep)
     {
@@ -152,31 +209,18 @@ struct View : public gui::Element
             glPopAttrib();
 
             glClear(GL_DEPTH_BUFFER_BIT);
-            auto model = TranslationMatrix(obj->position);
-            auto mvp = mul(viewProj, model);
-            glUseProgram(selection.arrowProg);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-            glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_eye"), 1, &viewpoint.position.x);
-            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.1f, 0.1f, 0.5f);
-            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.1f, 0.1f, 0.5f);
-            selection.arrowMesh.Draw();
-
-            model = Pose(obj->position, RotationQuaternion({1,0,0},-1.57f)).Matrix();
-            mvp = mul(viewProj, model);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.1f, 0.5f, 0.1f);
-            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.1f, 0.5f, 0.1f);
-            selection.arrowMesh.Draw();
-
-            model = Pose(obj->position, RotationQuaternion({0,1,0},+1.57f)).Matrix();
-            mvp = mul(viewProj, model);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-            glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 0.5f, 0.1f, 0.1f);
-            glUniform3f(glGetUniformLocation(selection.arrowProg, "u_emissive"), 0.5f, 0.1f, 0.1f);
-            selection.arrowMesh.Draw();
+            for(auto & part : gizmoParts)
+            {
+                auto model = (obj->pose * Pose({0,0,0}, part.orientation)).Matrix(), mvp = mul(viewProj, model);
+                auto color = part.axis * 0.4f + 0.1f;
+                glUseProgram(selection.arrowProg);
+                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
+                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
+                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_eye"), 1, &viewpoint.position.x);
+                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 1, &color.x);
+                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_emissive"), 1, &color.x);
+                GetGizmoMesh().Draw();
+            }
         }
 
         glPopAttrib();
@@ -193,6 +237,16 @@ struct View : public gui::Element
         return {};
     }
 
+    gui::DraggerPtr CreateGizmoDragger(Object & obj, Raycaster caster, const float3 & axis, const int2 & cursor)
+    {
+        switch(mode)
+        {
+        case Translation: return std::make_shared<LinearTranslationDragger>(obj, caster, axis, cursor);
+        case Rotation:  return std::make_shared<AxisRotationDragger>(obj, caster, axis, cursor);
+        default: return std::make_shared<LinearTranslationDragger>(obj, caster, axis, cursor);
+        }
+    }
+
     gui::DraggerPtr OnClick(const gui::MouseEvent & e) override
     {
         // Mouselook when the user drags the right mouse button
@@ -207,17 +261,18 @@ struct View : public gui::Element
             // If an object is selected, check if we have clicked on its gizmo
             if(auto obj = selection.object.lock())
             {
-                auto localRay = Pose(obj->position, {0,0,0,1}).Inverse() * ray;
-                auto hit = selection.arrowMesh.Hit(localRay);
-                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*obj, caster, float3(0,0,1), e.cursor);
-
-                localRay = Pose(obj->position, RotationQuaternion({1,0,0},-1.57f)).Inverse() * ray;
-                hit = selection.arrowMesh.Hit(localRay);
-                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*obj, caster, float3(0,1,0), e.cursor);
-
-                localRay = Pose(obj->position, RotationQuaternion({0,1,0},+1.57f)).Inverse() * ray;
-                hit = selection.arrowMesh.Hit(localRay);
-                if(hit.hit) return std::make_shared<LinearTranslationDragger>(*obj, caster, float3(1,0,0), e.cursor);
+                gui::DraggerPtr best; float bestT;
+                for(auto & part : gizmoParts)
+                {
+                    auto localRay = (obj->pose * Pose({0,0,0}, part.orientation)).Inverse() * ray;
+                    auto hit = GetGizmoMesh().Hit(localRay);
+                    if(hit.hit && (!best || hit.t < bestT))
+                    {
+                        best = CreateGizmoDragger(*obj, caster, qrot(obj->pose.orientation, part.axis), e.cursor);
+                        bestT = hit.t;
+                    }                    
+                }
+                if(best) return best;
             }
 
             // Otherwise see if we have selected a new object
@@ -286,7 +341,7 @@ class Editor
                 scene.objects[selectedIndex]->name = text;
                 objectList->SetItemText(selectedIndex, text);
             })});
-            props.push_back({"Position", factory.MakeVectorEdit(obj->position)});
+            props.push_back({"Position", factory.MakeVectorEdit(obj->pose.position)});
             props.push_back({"Diffuse Color", factory.MakeVectorEdit(obj->color)});
             props.push_back({"Emissive Color", factory.MakeVectorEdit(obj->lightColor)});
         }
@@ -346,16 +401,20 @@ void main()
         auto prog = gl::LinkProgram(vs, fs);
         selection.selectionProgram = gl::LinkProgram(vs, fs2);
 
-        for(uint32_t i=0; i<12; ++i)
-        {
-            const float a = i*6.28f/12, c = std::cos(a), s = std::sin(a);
-            selection.arrowMesh.vertices.push_back({{c*0.05f,s*0.05f,0},{c,s,0}});
-            selection.arrowMesh.vertices.push_back({{c*0.05f,s*0.05f,1},{c,s,0}});
-            selection.arrowMesh.triangles.push_back({{i*2,i*2+1,(i*2+3)%24}});
-            selection.arrowMesh.triangles.push_back({{i*2,(i*2+3)%24,(i*2+2)%24}});
-        }
+        selection.arrowMesh.AddCylinder({0,0,0}, 0.00f, {0,0,0}, 0.05f, {1,0,0}, {0,1,0}, 12);
+        selection.arrowMesh.AddCylinder({0,0,0}, 0.05f, {0,0,1}, 0.05f, {1,0,0}, {0,1,0}, 12);
+        selection.arrowMesh.AddCylinder({0,0,1}, 0.05f, {0,0,1}, 0.10f, {1,0,0}, {0,1,0}, 12);
+        selection.arrowMesh.AddCylinder({0,0,1}, 0.10f, {0,0,1.2f}, 0.0f, {1,0,0}, {0,1,0}, 12);
+        selection.arrowMesh.ComputeNormals();
         selection.arrowMesh.Upload();
         selection.arrowProg = prog;
+
+        selection.circleMesh.AddCylinder({0,0,-0.02f}, 0.80f, {0,0,-0.02f}, 1.00f, {1,0,0}, {0,1,0}, 32);
+        selection.circleMesh.AddCylinder({0,0,-0.02f}, 1.00f, {0,0,+0.02f}, 1.00f, {1,0,0}, {0,1,0}, 32);
+        selection.circleMesh.AddCylinder({0,0,+0.02f}, 1.00f, {0,0,+0.02f}, 0.80f, {1,0,0}, {0,1,0}, 32);
+        selection.circleMesh.AddCylinder({0,0,+0.02f}, 0.80f, {0,0,-0.02f}, 0.80f, {1,0,0}, {0,1,0}, 32);
+        selection.circleMesh.ComputeNormals();
+        selection.circleMesh.Upload();
 
         mesh = MakeBox({0.5f,0.5f,0.5f});
         ground = MakeBox({4,0.1f,4});
