@@ -47,6 +47,7 @@ template<class T> struct vec<T,4>
     template<class F> vec   apply(T r, F f) const               { return {f(x,r), f(y,r), f(z,r), f(w,r)}; }
 };
 
+template<class T, int M> vec<T,M> operator +  (const vec<T,M> & a)                      { return a.apply(T(), [](T x, T) { return +x; }); }
 template<class T, int M> vec<T,M> operator -  (const vec<T,M> & a)                      { return a.apply(T(), [](T x, T) { return -x; }); }
 template<class T, int M> vec<T,M> operator +  (const vec<T,M> & a, const vec<T,M> & b)  { return a.apply(b, [](T a, T b) { return a+b; }); }
 template<class T, int M> vec<T,M> operator -  (const vec<T,M> & a, const vec<T,M> & b)  { return a.apply(b, [](T a, T b) { return a-b; }); }

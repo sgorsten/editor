@@ -17,7 +17,7 @@ struct Selection
     std::weak_ptr<Object> object;
     GLuint selectionProgram;
 
-    Mesh arrowMesh, circleMesh;
+    Mesh arrowMesh, circleMesh, scaleMesh;
     GLuint arrowProg;
 
     Selection() : selectionProgram() {}
@@ -163,9 +163,9 @@ struct View : public gui::Element
     {
         switch(mode)
         {
-        case Translation: return selection.arrowMesh;
+        default: case Translation: return selection.arrowMesh;
         case Rotation: return selection.circleMesh;
-        default: return selection.arrowMesh;
+        case Scaling: return selection.scaleMesh;
         }
     }  
 
@@ -263,7 +263,7 @@ struct View : public gui::Element
     {
         switch(mode)
         {
-        case Translation: return std::make_shared<LinearTranslationDragger>(obj, caster, axis, cursor);
+        default: case Translation: return std::make_shared<LinearTranslationDragger>(obj, caster, axis, cursor);
         case Rotation: return std::make_shared<AxisRotationDragger>(obj, caster, axis, cursor);
         case Scaling: return std::make_shared<LinearScalingDragger>(obj, caster, axis, cursor);
         }
@@ -311,16 +311,8 @@ struct View : public gui::Element
 Mesh MakeBox(const float3 & halfDims)
 {
     Mesh mesh;
-    mesh.vertices = {
-        {{+1,-1,-1},{+1,0,0}}, {{+1,+1,-1},{+1,0,0}}, {{+1,+1,+1},{+1,0,0}}, {{+1,-1,+1},{+1,0,0}},
-        {{-1,+1,-1},{-1,0,0}}, {{-1,-1,-1},{-1,0,0}}, {{-1,-1,+1},{-1,0,0}}, {{-1,+1,+1},{-1,0,0}},
-        {{-1,+1,-1},{0,+1,0}}, {{-1,+1,+1},{0,+1,0}}, {{+1,+1,+1},{0,+1,0}}, {{+1,+1,-1},{0,+1,0}},
-        {{-1,-1,+1},{0,-1,0}}, {{-1,-1,-1},{0,-1,0}}, {{+1,-1,-1},{0,-1,0}}, {{+1,-1,+1},{0,-1,0}},
-        {{-1,-1,+1},{0,0,+1}}, {{+1,-1,+1},{0,0,+1}}, {{+1,+1,+1},{0,0,+1}}, {{-1,+1,+1},{0,0,+1}},
-        {{+1,-1,-1},{0,0,-1}}, {{-1,-1,-1},{0,0,-1}}, {{-1,+1,-1},{0,0,-1}}, {{+1,+1,-1},{0,0,-1}}
-    };
-    mesh.triangles = {{0,1,2}, {0,2,3}, {4,5,6}, {4,6,7}, {8,9,10}, {8,10,11}, {12,13,14}, {12,14,15}, {16,17,18}, {16,18,19}, {20,21,22}, {20,22,23}};
-    for(auto & vert : mesh.vertices) vert.position *= halfDims;
+    mesh.AddBox(-halfDims, +halfDims);
+    mesh.ComputeNormals();
     mesh.Upload();
     return mesh;
 }
@@ -442,6 +434,12 @@ void main()
         selection.circleMesh.AddCylinder({0,0,+0.02f}, 0.90f, {0,0,-0.02f}, 0.90f, {1,0,0}, {0,1,0}, 32);
         selection.circleMesh.ComputeNormals();
         selection.circleMesh.Upload();
+
+        selection.scaleMesh.AddCylinder({0,0,0}, 0.00f, {0,0,0}, 0.05f, {1,0,0}, {0,1,0}, 12);
+        selection.scaleMesh.AddCylinder({0,0,0}, 0.05f, {0,0,1}, 0.05f, {1,0,0}, {0,1,0}, 12);
+        selection.scaleMesh.AddBox({-0.1f,-0.1f,1}, {+0.1f,+0.1f,1.2f});
+        selection.scaleMesh.ComputeNormals();
+        selection.scaleMesh.Upload();
 
         mesh = MakeBox({0.5f,0.5f,0.5f});
         ground = MakeBox({4,0.1f,4});
