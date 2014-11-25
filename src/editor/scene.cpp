@@ -40,7 +40,11 @@ void Object::Draw(const float4x4 & viewProj, const float3 & eye, const LightEnvi
     gl::Uniform(prog, "u_modelViewProj", mul(viewProj, model));
     gl::Uniform(prog, "u_eye", eye);
     gl::Uniform(prog, "u_diffuse", color);
-    gl::Uniform(prog, "u_emissive", lightColor);
+    gl::Uniform(prog, "u_emissive", float3(0,0,0));
+    if(light)
+    {
+        gl::Uniform(prog, "u_emissive", light->color);
+    }
     lights.Bind(prog);
     mesh->Draw();
 }
@@ -64,6 +68,6 @@ std::shared_ptr<Object> Scene::Hit(const Ray & ray)
 void Scene::Draw(const float4x4 & viewProj, const float3 & eye)
 {
     LightEnvironment lights;
-    for(auto & obj : objects) if(mag2(obj->lightColor) > 0) lights.lights.push_back({obj->pose.position, obj->lightColor});
+    for(auto & obj : objects) if(obj->light) lights.lights.push_back({obj->pose.position, obj->light->color});
     for(auto & obj : objects) obj->Draw(viewProj, eye, lights);
 }

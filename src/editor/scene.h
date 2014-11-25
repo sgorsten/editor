@@ -71,6 +71,11 @@ struct Mesh
     }
 };
 
+struct LightComponent
+{
+    float3 color;
+};
+
 struct Object
 {
     std::string name;
@@ -81,7 +86,10 @@ struct Object
     Mesh * mesh;
     GLuint prog;
 
-    float3 lightColor;
+    std::unique_ptr<LightComponent> light;
+
+    Object() : mesh(), prog() {}
+    Object(const Object & r) : name(r.name), pose(r.pose), localScale(r.localScale), color(r.color), mesh(r.mesh), prog(r.prog), light(r.light ? std::make_unique<LightComponent>(*r.light) : nullptr) {}
 
     RayMeshHit Hit(const Ray & ray) const
     { 
@@ -102,7 +110,7 @@ struct Scene
 
     void Draw(const float4x4 & viewProj, const float3 & eye);
 
-    std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, Mesh * mesh, GLuint prog, const float3 & diffuseColor, const float3 & emissiveColor)
+    std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, Mesh * mesh, GLuint prog, const float3 & diffuseColor)
     {
         auto obj = std::make_shared<Object>();
         obj->name = name;
@@ -111,7 +119,6 @@ struct Scene
         obj->mesh = mesh;
         obj->prog = prog;
         obj->color = diffuseColor;
-        obj->lightColor = emissiveColor;
         objects.push_back(obj);
         return obj;
     }

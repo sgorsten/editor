@@ -348,9 +348,11 @@ class Editor
 
     void RefreshPropertyPanel()
     {
-        std::vector<std::pair<std::string, gui::ElementPtr>> props;
+        propertyPanel->children.clear();
+
         if(auto obj = selection.object.lock())
         {
+            std::vector<std::pair<std::string, gui::ElementPtr>> props;
             props.push_back({"Name", factory.MakeEdit(obj->name, [this](const std::string & text)
             {
                 int selectedIndex = objectList->GetSelectedIndex();
@@ -361,9 +363,26 @@ class Editor
             props.push_back({"Orientation", factory.MakeVectorEdit(obj->pose.orientation)});
             props.push_back({"Scale", factory.MakeVectorEdit(obj->localScale)});
             props.push_back({"Diffuse Color", factory.MakeVectorEdit(obj->color)});
-            props.push_back({"Emissive Color", factory.MakeVectorEdit(obj->lightColor)});
+            auto pmap = factory.MakePropertyMap(props);
+            auto size = pmap->children.empty() ? 0 : pmap->children.back().placement.y1.b;
+            propertyPanel->AddChild({{0,0},{0,0},{1,0},{0,size}}, pmap);
+
+            if(obj->light)
+            {
+                props.clear();
+                props.push_back({"Emissive Color", factory.MakeVectorEdit(obj->light->color)});
+                pmap = factory.MakePropertyMap(props);
+
+                auto y0 = size + 8;
+                propertyPanel->AddChild({{0,0},{0,y0},{1,0},{0,y0+font.GetLineHeight()}}, factory.MakeLabel("Light Component:"));
+                y0 += font.GetLineHeight();
+                size = pmap->children.empty() ? 0 : pmap->children.back().placement.y1.b;
+                pmap = Border::CreateBigBorder(pmap);
+                size += 8;
+                propertyPanel->AddChild({{0,0},{0,y0},{1,0},{0,y0+size}}, pmap);
+            }
         }
-        propertyPanel->children = {{{{0,0},{0,0},{1,0},{1,0}}, factory.MakePropertyMap(props)}};
+
         window.RefreshLayout();
     }
 public:
@@ -444,11 +463,13 @@ void main()
         mesh = MakeBox({0.5f,0.5f,0.5f});
         ground = MakeBox({4,0.1f,4});
         bulb = MakeBox({0.1f,0.1f,0.1f});
-        scene.CreateObject("Ground",{    0,-0.1f,  0},&ground,prog,{0.4f,0.4f,0.4f},{0,0,0});
-        scene.CreateObject("Alpha", {-0.6f, 0.5f,  0},&mesh,prog,{1,0,0},{0,0,0});
-        scene.CreateObject("Beta",  {+0.6f, 0.5f,  0},&mesh,prog,{0,1,0},{0,0,0});
-        scene.CreateObject("Gamma", { 0.0f, 1.5f,  0},&mesh,prog,{1,1,0},{0,0,0});
-        scene.CreateObject("Light", { 0.0f, 3.0f,1.0},&bulb,prog,{0,0,0},{1,1,1});
+        scene.CreateObject("Ground",{    0,-0.1f,  0},&ground,prog,{0.4f,0.4f,0.4f});
+        scene.CreateObject("Alpha", {-0.6f, 0.5f,  0},&mesh,prog,{1,0,0});
+        scene.CreateObject("Beta",  {+0.6f, 0.5f,  0},&mesh,prog,{0,1,0});
+        scene.CreateObject("Gamma", { 0.0f, 1.5f,  0},&mesh,prog,{1,1,0});
+        auto lt = scene.CreateObject("Light", { 0.0f, 3.0f,1.0},&bulb,prog,{0,0,0});
+        lt->light = std::make_unique<LightComponent>();
+        lt->light->color = {1,1,1};
         view->viewpoint.position = {0,1,4};
 
         objectListPanel = std::make_shared<gui::Element>();
@@ -485,7 +506,7 @@ void main()
             }),
             MenuItem::Popup("Object", {
                 {"New", [this,prog]() { 
-                    scene.CreateObject("New Object", {0,0,0}, &mesh, prog, {1,1,1}, {0,0,0});
+                    scene.CreateObject("New Object", {0,0,0}, &mesh, prog, {1,1,1});
                     RefreshObjectList();
                 }},
                 {"Duplicate", [this]() { 
@@ -496,7 +517,15 @@ void main()
                 {"Delete", [this]() { 
                     scene.DeleteObject(selection.object.lock());
                     RefreshObjectList();
-                }, 0, GLFW_KEY_DELETE}
+                }, 0, GLFW_KEY_DELETE},
+                MenuItem::Popup("Components", {
+                    {"Add Light", [this]() { 
+                        if(auto obj = selection.object.lock())
+                        {
+                            obj->light = std::make_unique<LightComponent>();
+                        }
+                    }}
+                })
             })
         });
     }
