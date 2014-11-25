@@ -128,13 +128,11 @@ public:
 
     gui::ElementPtr MakePropertyMap(std::vector<std::pair<std::string, gui::ElementPtr>> properties) const
     {
-        int y0 = 0;
+        float y0 = 0;
         auto panel = std::make_shared<gui::Element>();
         for(auto & pair : properties)
         {
-            int y1 = y0 + editBorder;
-            int y2 = y1 + font.GetLineHeight();
-            int y3 = y2 + editBorder;
+            float y1 = y0 + editBorder, y2 = y1 + font.GetLineHeight(), y3 = y2 + editBorder;
             panel->children.push_back({{{0,0},{0,y1},{0.5,-spacing*0.5f},{0,y2}}, MakeLabel(pair.first)});
             panel->children.push_back({{{0.5,spacing*0.5f},{0,y0},{1,0},{0,y3}}, pair.second});
             y0 = y3 + spacing;

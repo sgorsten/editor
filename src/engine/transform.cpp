@@ -21,6 +21,11 @@ float4x4 RigidTransformationMatrix(const float4 & rot, const float3 & vec)
     return {{qxdir(rot),0},{qydir(rot),0},{qzdir(rot),0},{vec,1}};
 }
 
+float4x4 ScaledTransformationMatrix(const float3 & scale, const float4 & rot, const float3 & vec)
+{
+    return {{qxdir(rot)*scale.x,0},{qydir(rot)*scale.y,0},{qzdir(rot)*scale.z,0},{vec,1}};
+}
+
 float4x4 PerspectiveMatrixRhGl(float verticalFieldOfViewInRadians, float aspectRatioWidthOverHeight, float nearClipDistance, float farClipDistance)
 {
     const auto yf = 1/std::tan(verticalFieldOfViewInRadians/2), xf = yf/aspectRatioWidthOverHeight, dz = nearClipDistance-farClipDistance;

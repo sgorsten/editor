@@ -49,7 +49,7 @@ struct Mesh
     void AddCylinder(const float3 & center0, float radius0, const float3 & center1, float radius1, const float3 & axisA, const float3 & axisB, int segments)
     {
         auto base = vertices.size();
-        for(uint32_t i=0; i<segments; ++i)
+        for(uint32_t i=0, n=segments; i<n; ++i)
         {
             const float angle = i*6.28f/segments;
             auto dir = axisA * std::cos(angle) + axisB * std::sin(angle);
@@ -66,6 +66,7 @@ struct Object
 {
     std::string name;
     Pose pose;
+    float3 localScale = float3(1,1,1);
 
     float3 color;
     Mesh * mesh;
@@ -73,7 +74,13 @@ struct Object
 
     float3 lightColor;
 
-    RayMeshHit Hit(const Ray & ray) const { return mesh->Hit(pose.Inverse() * ray); }
+    RayMeshHit Hit(const Ray & ray) const
+    { 
+        auto localRay = pose.Inverse() * ray;
+        localRay.start /= localScale;
+        localRay.direction /= localScale;
+        return mesh->Hit(localRay); 
+    }
 
     void Draw(const float4x4 & viewProj, const float3 & eye, const LightEnvironment & lights);
 };

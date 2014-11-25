@@ -6,19 +6,15 @@ void LightEnvironment::Bind(GLuint program) const
 {
     for(size_t i=0; i<lights.size(); ++i)
     {
-        std::ostringstream ss; ss << "u_lights[" << i << "].position";
-        glUniform3fv(glGetUniformLocation(program, ss.str().c_str()), 1, &lights[i].position.x);
-
-        ss.str({}); ss << "u_lights[" << i << "].color";
-        glUniform3fv(glGetUniformLocation(program, ss.str().c_str()), 1, &lights[i].color.x);
+        std::ostringstream ss; ss << "u_lights[" << i << "]"; auto obj = ss.str();
+        gl::Uniform(program, obj+".position", lights[i].position);
+        gl::Uniform(program, obj+".color", lights[i].color);
     }
     for(size_t i=lights.size(); i<8; ++i)
     {
-        std::ostringstream ss; ss << "u_lights[" << i << "].position";
-        glUniform3f(glGetUniformLocation(program, ss.str().c_str()), 0, 0, 0);
-
-        ss.str({}); ss << "u_lights[" << i << "].color";
-        glUniform3f(glGetUniformLocation(program, ss.str().c_str()), 0, 0, 0);
+        std::ostringstream ss; ss << "u_lights[" << i << "]"; auto obj = ss.str();
+        gl::Uniform(program, obj+".position", float3(0,0,0));
+        gl::Uniform(program, obj+".color", float3(0,0,0));
     }
 }
 
@@ -37,14 +33,14 @@ void Mesh::Draw() const
 
 void Object::Draw(const float4x4 & viewProj, const float3 & eye, const LightEnvironment & lights)
 {
-    auto model = pose.Matrix();
-    auto mvp = mul(viewProj, model);
+    auto model = ScaledTransformationMatrix(localScale, pose.orientation, pose.position);
     glUseProgram(prog);
-    glUniformMatrix4fv(glGetUniformLocation(prog, "u_model"), 1, GL_FALSE, &model.x.x);
-    glUniformMatrix4fv(glGetUniformLocation(prog, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-    glUniform3fv(glGetUniformLocation(prog, "u_eye"), 1, &eye.x);
-    glUniform3fv(glGetUniformLocation(prog, "u_diffuse"), 1, &color.x);
-    glUniform3fv(glGetUniformLocation(prog, "u_emissive"), 1, &lightColor.x);
+    gl::Uniform(prog, "u_model", model);
+    gl::Uniform(prog, "u_modelIT", inv(transpose(model)));
+    gl::Uniform(prog, "u_modelViewProj", mul(viewProj, model));
+    gl::Uniform(prog, "u_eye", eye);
+    gl::Uniform(prog, "u_diffuse", color);
+    gl::Uniform(prog, "u_emissive", lightColor);
     lights.Bind(prog);
     mesh->Draw();
 }

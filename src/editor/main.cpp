@@ -22,6 +22,12 @@ struct Selection
 
     Selection() : selectionProgram() {}
 
+    void Deselect()
+    {
+        object.reset();
+        if(onSelectionChanged) onSelectionChanged();
+    }
+
     void SetSelection(std::shared_ptr<Object> object)
     {
         if(object != this->object.lock())
@@ -200,14 +206,15 @@ struct View : public gui::Element
             glClear(GL_DEPTH_BUFFER_BIT);
             for(auto & axis : {float3(1,0,0), float3(0,1,0), float3(0,0,1)})
             {
-                auto model = (obj->pose * Pose({0,0,0}, RotationQuaternionFromToVec({0,0,1}, axis))).Matrix(), mvp = mul(viewProj, model);
+                auto model = (obj->pose * Pose({0,0,0}, RotationQuaternionFromToVec({0,0,1}, axis))).Matrix();
                 auto color = axis * 0.4f + 0.1f;
                 glUseProgram(selection.arrowProg);
-                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_model"), 1, GL_FALSE, &model.x.x);
-                glUniformMatrix4fv(glGetUniformLocation(selection.arrowProg, "u_modelViewProj"), 1, GL_FALSE, &mvp.x.x);
-                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_eye"), 1, &viewpoint.position.x);
-                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_diffuse"), 1, &color.x);
-                glUniform3fv(glGetUniformLocation(selection.arrowProg, "u_emissive"), 1, &color.x);
+                gl::Uniform(selection.arrowProg, "u_model", model);
+                gl::Uniform(selection.arrowProg, "u_modelIT", model);
+                gl::Uniform(selection.arrowProg, "u_modelViewProj", mul(viewProj, model));
+                gl::Uniform(selection.arrowProg, "u_eye", viewpoint.position);
+                gl::Uniform(selection.arrowProg, "u_diffuse", color);
+                gl::Uniform(selection.arrowProg, "u_emissive", color);
                 GetGizmoMesh().Draw();
             }
         }
@@ -217,7 +224,7 @@ struct View : public gui::Element
         if(e.hasFocus)
         {
 	        nvgBeginPath(e.vg);
-	        nvgRect(e.vg, rect.x0+1.5f, rect.y0+1.5f, rect.GetWidth()-3, rect.GetHeight()-3);
+	        nvgRect(e.vg, rect.x0+1.5f, rect.y0+1.5f, rect.GetWidth()-3.0f, rect.GetHeight()-3.0f);
 	        nvgStrokeColor(e.vg, nvgRGBA(255,255,255,128));
             nvgStrokeWidth(e.vg, 1);
 	        nvgStroke(e.vg);
@@ -231,7 +238,7 @@ struct View : public gui::Element
         switch(mode)
         {
         case Translation: return std::make_shared<LinearTranslationDragger>(obj, caster, axis, cursor);
-        case Rotation:  return std::make_shared<AxisRotationDragger>(obj, caster, axis, cursor);
+        case Rotation: return std::make_shared<AxisRotationDragger>(obj, caster, axis, cursor);
         default: return std::make_shared<LinearTranslationDragger>(obj, caster, axis, cursor);
         }
     }
@@ -266,7 +273,9 @@ struct View : public gui::Element
 
             // Otherwise see if we have selected a new object
             if(auto obj = scene.Hit(ray)) selection.SetSelection(obj);
-            // If we did not click on an object directly, perhaps we should box select? 
+            else selection.Deselect();
+
+            // If we did not click on an object directly, perhaps we should box select?             
         }
 
         return nullptr;
@@ -315,7 +324,7 @@ class Editor
         auto it = std::find(begin(scene.objects), end(scene.objects), selection.object.lock());
         objectList->SetSelectedIndex(it != end(scene.objects) ? it - begin(scene.objects) : -1);
         objectListPanel->children = {{{{0,0},{0,0},{1,0},{1,0}}, objectList}};
-        objectList->onSelectionChanged = [this]() { selection.SetSelection(scene.objects[objectList->GetSelectedIndex()]); };
+        objectList->onSelectionChanged = [this]() { if(objectList->GetSelectedIndex() >= 0) selection.SetSelection(scene.objects[objectList->GetSelectedIndex()]); else selection.Deselect(); };
         RefreshPropertyPanel();
     }
 
@@ -332,6 +341,7 @@ class Editor
             })});
             props.push_back({"Position", factory.MakeVectorEdit(obj->pose.position)});
             props.push_back({"Orientation", factory.MakeVectorEdit(obj->pose.orientation)});
+            props.push_back({"Scale", factory.MakeVectorEdit(obj->localScale)});
             props.push_back({"Diffuse Color", factory.MakeVectorEdit(obj->color)});
             props.push_back({"Emissive Color", factory.MakeVectorEdit(obj->lightColor)});
         }
@@ -345,6 +355,7 @@ public:
 
         auto vs = gl::CompileShader(GL_VERTEX_SHADER, R"(#version 330
 uniform mat4 u_model;
+uniform mat4 u_modelIT;
 uniform mat4 u_modelViewProj;
 layout(location = 0) in vec3 v_position;
 layout(location = 1) in vec3 v_normal;
@@ -354,7 +365,7 @@ void main()
 {
     gl_Position = u_modelViewProj * vec4(v_position,1);
     position = (u_model * vec4(v_position,1)).xyz;
-    normal = (u_model * vec4(v_normal,0)).xyz;
+    normal = normalize((u_modelIT * vec4(v_normal,0)).xyz);
 }
 )");
 
@@ -377,12 +388,12 @@ void main()
     for(int i=0; i<8; ++i)
     {
         vec3 lightDir = normalize(u_lights[i].position - position);
-        light += u_lights[i].color * max(dot(normal, lightDir), 0);
+        light += u_lights[i].color * u_diffuse * max(dot(normal, lightDir), 0);
 
         vec3 halfDir = normalize(lightDir + eyeDir);
-        light += u_lights[i].color * pow(max(dot(normal, halfDir), 0), 128);
+        light += u_lights[i].color * u_diffuse * pow(max(dot(normal, halfDir), 0), 128);
     }
-    gl_FragColor = vec4(u_diffuse*light,1);
+    gl_FragColor = vec4(light,1);
 }
 )");
 
@@ -413,7 +424,7 @@ void main()
         scene.CreateObject("Alpha", {-0.6f, 0.5f,  0},&mesh,prog,{1,0,0},{0,0,0});
         scene.CreateObject("Beta",  {+0.6f, 0.5f,  0},&mesh,prog,{0,1,0},{0,0,0});
         scene.CreateObject("Gamma", { 0.0f, 1.5f,  0},&mesh,prog,{1,1,0},{0,0,0});
-        scene.CreateObject("Light", { 0.0f, 3.0f,1.0},&bulb,prog,{1,1,1},{1,1,1});
+        scene.CreateObject("Light", { 0.0f, 3.0f,1.0},&bulb,prog,{0,0,0},{1,1,1});
         view->viewpoint.position = {0,1,4};
 
         objectListPanel = std::make_shared<gui::Element>();

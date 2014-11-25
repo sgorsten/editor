@@ -11,6 +11,7 @@ float4 RotationQuaternionFromToVec(const float3 & fromVector, const float3 & toV
 
 float4x4 TranslationMatrix(const float3 & translationVec);
 float4x4 RigidTransformationMatrix(const float4 & rotationQuat, const float3 & translationVec);
+float4x4 ScaledTransformationMatrix(const float3 & scalingFactors, const float4 & rotationQuat, const float3 & translationVec);
 float4x4 PerspectiveMatrixRhGl(float verticalFieldOfViewInRadians, float aspectRatioWidthOverHeight, float nearClipDistance, float farClipDistance);
 
 struct Pose

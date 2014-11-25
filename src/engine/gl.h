@@ -56,6 +56,14 @@ namespace gl
 
     GLuint CompileShader(GLenum type, const char * source);
     GLuint LinkProgram(GLuint vertShader, GLuint fragShader);
+
+    inline void Uniform(GLint location, const float4x4 & mat) { glUniformMatrix4fv(location, 1, GL_FALSE, &mat.x.x); }
+    inline void Uniform(GLint location, const float2 & vec) { glUniform2fv(location, 1, &vec.x); }
+    inline void Uniform(GLint location, const float3 & vec) { glUniform3fv(location, 1, &vec.x); }
+    inline void Uniform(GLint location, const float4 & vec) { glUniform4fv(location, 1, &vec.x); }
+
+    template<class T> void Uniform(GLuint program, const char * name, const T & value) { Uniform(glGetUniformLocation(program, name), value); }
+    template<class T> void Uniform(GLuint program, const std::string & name, const T & value) { Uniform(program, name.c_str(), value); }
 }
 
 #endif
