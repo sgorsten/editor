@@ -283,6 +283,19 @@ static void DrawElement(NVGcontext * vg, const gui::Element & elem, const gui::E
     nvgRestore(vg);
 }
 
+static void DrawElementBounds(NVGcontext * vg, const gui::Element & elem, const gui::Element * mouseover, const gui::Element * focus)
+{
+    for(const auto & child : elem.children) DrawElementBounds(vg, *child.element, mouseover, focus);
+
+    nvgBeginPath(vg);
+    nvgRect(vg, elem.rect.x0+0.5f, elem.rect.y0+0.5f, elem.rect.GetWidth()-1.0f, elem.rect.GetHeight()-1.0f);
+    if(&elem == focus) nvgStrokeColor(vg, nvgRGBAf(1,0,0,1));
+    else if(&elem == mouseover) nvgStrokeColor(vg, nvgRGBAf(1,1,0,1));
+    else nvgStrokeColor(vg, nvgRGBAf(1,1,1,1));
+    nvgStrokeWidth(vg, 1);
+    nvgStroke(vg);
+}
+
 void Window::Redraw()
 {
     glfwMakeContextCurrent(window);
@@ -293,6 +306,7 @@ void Window::Redraw()
 
     nvgBeginFrame(vg, width, height, 1.0f);
     DrawElement(vg, *root, mouseover.get(), focus.get(), nvgRGBA(0,0,0,0));
+    //DrawElementBounds(vg, *root, mouseover.get(), focus.get());
     nvgEndFrame(vg);
 
     glPopAttrib();

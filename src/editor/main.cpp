@@ -364,22 +364,21 @@ class Editor
             props.push_back({"Scale", factory.MakeVectorEdit(obj->localScale)});
             props.push_back({"Diffuse Color", factory.MakeVectorEdit(obj->color)});
             auto pmap = factory.MakePropertyMap(props);
-            auto size = pmap->children.empty() ? 0 : pmap->children.back().placement.y1.b;
-            propertyPanel->AddChild({{0,0},{0,0},{1,0},{0,size}}, pmap);
+            float y0 = pmap->GetMinimumSize().y;
+            propertyPanel->AddChild({{0,0},{0,0},{1,0},{0,y0}}, pmap);
 
             if(obj->light)
             {
                 props.clear();
                 props.push_back({"Emissive Color", factory.MakeVectorEdit(obj->light->color)});
-                pmap = factory.MakePropertyMap(props);
+                pmap = Border::CreateBigBorder(factory.MakePropertyMap(props));
 
-                auto y0 = size + 8;
-                propertyPanel->AddChild({{0,0},{0,y0},{1,0},{0,y0+font.GetLineHeight()}}, factory.MakeLabel("Light Component:"));
-                y0 += font.GetLineHeight();
-                size = pmap->children.empty() ? 0 : pmap->children.back().placement.y1.b;
-                pmap = Border::CreateBigBorder(pmap);
-                size += 8;
-                propertyPanel->AddChild({{0,0},{0,y0},{1,0},{0,y0+size}}, pmap);
+                y0 += 8;
+                auto y1 = y0+font.GetLineHeight();
+                propertyPanel->AddChild({{0,0},{0,y0},{1,0},{0,y1}}, factory.MakeLabel("Light Component:"));
+                y0 = y1;
+                y1 += pmap->GetMinimumSize().y;
+                propertyPanel->AddChild({{0,0},{0,y0},{1,0},{0,y1}}, pmap);
             }
         }
 

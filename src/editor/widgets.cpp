@@ -278,10 +278,13 @@ class SplitterBorder : public gui::Element
         Dragger(gui::Element & panel, const DimensionDesc & dim, const int2 & click) : panel(panel), initialPlacement(panel.children[0].placement), dim(dim), click(click.*dim.coord) {}
         void OnDrag(int2 newMouse) override
         {
+            auto minA = panel.children[1].element->GetMinimumSize();
+            auto minB = panel.children[2].element->GetMinimumSize();
+
             auto borderRect = initialPlacement.resolve(panel.rect);
             int delta = newMouse.*dim.coord - click;
-            delta = std::max(delta, panel.rect.*dim.r0 + 100 - borderRect.*dim.r0);
-            delta = std::min(delta, panel.rect.*dim.r1 - 100 - borderRect.*dim.r1);
+            delta = std::max(delta, panel.rect.*dim.r0 + minA.*dim.coord - borderRect.*dim.r0);
+            delta = std::min(delta, panel.rect.*dim.r1 - minB.*dim.coord - borderRect.*dim.r1);
             auto placement = initialPlacement;
             (placement.*dim.u0).b += delta;
             (placement.*dim.u1).b += delta;

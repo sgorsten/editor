@@ -87,8 +87,11 @@ namespace gui
         std::vector<Child>                                  children;
         bool                                                isVisible;
         bool                                                isTransparent;  // If true, this element will ignore mouse events
+        int2                                                minimumSize;    // Minimum size that this element should occupy, independent of children
         
                                                             Element();
+
+        int2                                                GetMinimumSize() const; // Compute minimum size for this element, inclusive of children
 
         void                                                AddChild(const URect & placement, ElementPtr child);
         void                                                SetRect(const Rect & rect);

@@ -123,21 +123,23 @@ public:
     {
         auto elem = std::make_shared<Text>(font);
         elem->text = text;
+        elem->minimumSize = {font.GetStringWidth(text), font.GetLineHeight()};
         return elem;
     }
 
     gui::ElementPtr MakePropertyMap(std::vector<std::pair<std::string, gui::ElementPtr>> properties) const
     {
         float y0 = 0;
-        auto panel = std::make_shared<gui::Element>();
+        auto labelPanel = std::make_shared<gui::Element>(), valuePanel = std::make_shared<gui::Element>();
+        valuePanel->minimumSize.x = 128;
         for(auto & pair : properties)
         {
             float y1 = y0 + editBorder, y2 = y1 + font.GetLineHeight(), y3 = y2 + editBorder;
-            panel->children.push_back({{{0,0},{0,y1},{0.5,-spacing*0.5f},{0,y2}}, MakeLabel(pair.first)});
-            panel->children.push_back({{{0.5,spacing*0.5f},{0,y0},{1,0},{0,y3}}, pair.second});
+            labelPanel->children.push_back({{{0,0},{0,y1},{1,0},{0,y2}}, MakeLabel(pair.first)});
+            valuePanel->children.push_back({{{0,0},{0,y0},{1,0},{0,y3}}, pair.second});
             y0 = y3 + spacing;
         }
-        return panel;
+        return std::make_shared<Splitter>(valuePanel, labelPanel, Splitter::Left, labelPanel->GetMinimumSize().x);       
     }
 
     gui::ElementPtr MakeEdit(const std::string & text, std::function<void(const std::string & text)> onEdit={}) const
