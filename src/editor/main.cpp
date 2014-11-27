@@ -17,12 +17,12 @@
 struct Selection
 {
     std::weak_ptr<Object> object;
-    GLuint selectionProgram;
+    AssetHandle<GLuint> selectionProgram;
 
     Mesh arrowMesh, circleMesh, scaleMesh;
-    GLuint arrowProg;
+    AssetHandle<GLuint> arrowProg;
 
-    Selection() : selectionProgram() {}
+    Selection() {}
 
     void Deselect()
     {
@@ -236,13 +236,13 @@ struct View : public gui::Element
             {
                 auto model = (obj->pose * Pose({0,0,0}, RotationQuaternionFromToVec({0,0,1}, axis))).Matrix();
                 auto color = axis * 0.4f + 0.1f;
-                glUseProgram(selection.arrowProg);
-                gl::Uniform(selection.arrowProg, "u_model", model);
-                gl::Uniform(selection.arrowProg, "u_modelIT", model);
-                gl::Uniform(selection.arrowProg, "u_modelViewProj", mul(viewProj, model));
-                gl::Uniform(selection.arrowProg, "u_eye", viewpoint.position);
-                gl::Uniform(selection.arrowProg, "u_diffuse", color);
-                gl::Uniform(selection.arrowProg, "u_emissive", color);
+                glUseProgram(selection.arrowProg.GetAsset());
+                gl::Uniform(selection.arrowProg.GetAsset(), "u_model", model);
+                gl::Uniform(selection.arrowProg.GetAsset(), "u_modelIT", model);
+                gl::Uniform(selection.arrowProg.GetAsset(), "u_modelViewProj", mul(viewProj, model));
+                gl::Uniform(selection.arrowProg.GetAsset(), "u_eye", viewpoint.position);
+                gl::Uniform(selection.arrowProg.GetAsset(), "u_diffuse", color);
+                gl::Uniform(selection.arrowProg.GetAsset(), "u_emissive", color);
                 GetGizmoMesh().Draw();
             }
         }
@@ -319,16 +319,32 @@ Mesh MakeBox(const float3 & halfDims)
     return mesh;
 }
 
+std::string LoadTextFile(const std::string & filename)
+{
+    std::string contents;
+    FILE * f = fopen(filename.c_str(), "rb");
+    if(f)
+    {
+        fseek(f, 0, SEEK_END);
+        auto len = ftell(f);
+        contents.resize(len);
+        fseek(f, 0, SEEK_SET);
+        fread(&contents[0], 1, contents.size(), f);
+        fclose(f);
+    }
+    return contents;
+}
+
 class Editor
 {
     Window                  window;      
+    AssetLibrary            assets;
     Font                    font;
     GuiFactory              factory;
     std::shared_ptr<ListBox>objectList;
     gui::ElementPtr         objectListPanel;
     gui::ElementPtr         propertyPanel;
     gui::ElementPtr         guiRoot;
-    Mesh                    mesh,ground,bulb;
 
     Scene                   scene;
     Selection               selection;
@@ -437,8 +453,8 @@ void main()
 
         auto fs2 = gl::CompileShader(GL_FRAGMENT_SHADER, "#version 330\nvoid main() { gl_FragColor = vec4(1,1,1,1); }");
 
-        auto prog = gl::LinkProgram(vs, fs);
-        selection.selectionProgram = gl::LinkProgram(vs, fs2);
+        auto prog = assets.RegisterProgram("diffuse", gl::LinkProgram(vs, fs));
+        selection.selectionProgram = assets.RegisterProgram("selection", gl::LinkProgram(vs, fs2));
 
         selection.arrowMesh.AddCylinder({0,0,0}, 0.00f, {0,0,0}, 0.05f, {1,0,0}, {0,1,0}, 12);
         selection.arrowMesh.AddCylinder({0,0,0}, 0.05f, {0,0,1}, 0.05f, {1,0,0}, {0,1,0}, 12);
@@ -461,14 +477,14 @@ void main()
         selection.scaleMesh.ComputeNormals();
         selection.scaleMesh.Upload();
 
-        mesh = MakeBox({0.5f,0.5f,0.5f});
-        ground = MakeBox({4,0.1f,4});
-        bulb = MakeBox({0.1f,0.1f,0.1f});
-        scene.CreateObject("Ground",{    0,-0.1f,  0},&ground,prog,{0.4f,0.4f,0.4f});
-        scene.CreateObject("Alpha", {-0.6f, 0.5f,  0},&mesh,prog,{1,0,0});
-        scene.CreateObject("Beta",  {+0.6f, 0.5f,  0},&mesh,prog,{0,1,0});
-        scene.CreateObject("Gamma", { 0.0f, 1.5f,  0},&mesh,prog,{1,1,0});
-        auto lt = scene.CreateObject("Light", { 0.0f, 3.0f,1.0},&bulb,prog,{0,0,0});
+        auto mesh = assets.RegisterMesh("box", MakeBox({0.5f,0.5f,0.5f}));
+        auto ground = assets.RegisterMesh("ground", MakeBox({4,0.1f,4}));
+        auto bulb = assets.RegisterMesh("bulb", MakeBox({0.1f,0.1f,0.1f}));
+        scene.CreateObject("Ground",{    0,-0.1f,  0},ground,prog,{0.4f,0.4f,0.4f});
+        scene.CreateObject("Alpha", {-0.6f, 0.5f,  0},mesh,prog,{1,0,0});
+        scene.CreateObject("Beta",  {+0.6f, 0.5f,  0},mesh,prog,{0,1,0});
+        scene.CreateObject("Gamma", { 0.0f, 1.5f,  0},mesh,prog,{1,1,0});
+        auto lt = scene.CreateObject("Light", { 0.0f, 3.0f,1.0},bulb,prog,{0,0,0});
         lt->light = std::make_unique<LightComponent>();
         lt->light->color = {1,1,1};
         view->viewpoint.position = {0,1,4};
@@ -495,11 +511,16 @@ void main()
                 {"New", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_N},
                 MenuItem::Popup("Open", {
                     {"Game", [](){}},
-                    {"Level", [](){ auto f = ChooseFile({{"Scene files","scene"}}, true); }}
+                    {"Level", [this](){ 
+                        auto f = ChooseFile({{"Scene files","scene"}}, true);
+                        if(f.empty()) return;
+                        scene.FromJson(assets, jsonFrom(LoadTextFile(f)));
+                        RefreshObjectList();
+                    }}
                 }),
                 {"Save", [this](){ 
                     auto f = ChooseFile({{"Scene files","scene"}}, false);
-                    if(!f.empty()) std::ofstream(f) << tabbed(scene.ToJson(), 4);
+                    if(!f.empty()) std::ofstream(f, std::ofstream::binary) << tabbed(scene.ToJson(), 4);
                 }, GLFW_MOD_CONTROL, GLFW_KEY_S},
                 {"Exit", [this]() { quit = true; }, GLFW_MOD_ALT, GLFW_KEY_F4}
             }),
@@ -509,8 +530,8 @@ void main()
                 {"Paste", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_V}
             }),
             MenuItem::Popup("Object", {
-                {"New", [this,prog]() { 
-                    scene.CreateObject("New Object", {0,0,0}, &mesh, prog, {1,1,1});
+                {"New", [this]() { 
+                    scene.CreateObject("New Object", {0,0,0}, assets.GetMesh("box"), assets.GetProgram("diffuse"), {1,1,1});
                     RefreshObjectList();
                 }},
                 {"Duplicate", [this]() { 

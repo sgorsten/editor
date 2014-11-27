@@ -22,6 +22,7 @@
     </ClInclude>
     <ClInclude Include="..\..\src\editor\scene.h" />
     <ClInclude Include="..\..\src\editor\xplat.h" />
+    <ClInclude Include="..\..\src\editor\asset.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

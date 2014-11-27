@@ -33,20 +33,21 @@ void Mesh::Draw() const
 
 void Object::Draw(const float4x4 & viewProj, const float3 & eye, const LightEnvironment & lights)
 {
+    if(!prog.IsValid() || !mesh.IsValid()) return;
     auto model = ScaledTransformationMatrix(localScale, pose.orientation, pose.position);
-    glUseProgram(prog);
-    gl::Uniform(prog, "u_model", model);
-    gl::Uniform(prog, "u_modelIT", inv(transpose(model)));
-    gl::Uniform(prog, "u_modelViewProj", mul(viewProj, model));
-    gl::Uniform(prog, "u_eye", eye);
-    gl::Uniform(prog, "u_diffuse", color);
-    gl::Uniform(prog, "u_emissive", float3(0,0,0));
+    glUseProgram(prog.GetAsset());
+    gl::Uniform(prog.GetAsset(), "u_model", model);
+    gl::Uniform(prog.GetAsset(), "u_modelIT", inv(transpose(model)));
+    gl::Uniform(prog.GetAsset(), "u_modelViewProj", mul(viewProj, model));
+    gl::Uniform(prog.GetAsset(), "u_eye", eye);
+    gl::Uniform(prog.GetAsset(), "u_diffuse", color);
+    gl::Uniform(prog.GetAsset(), "u_emissive", float3(0,0,0));
     if(light)
     {
-        gl::Uniform(prog, "u_emissive", light->color);
+        gl::Uniform(prog.GetAsset(), "u_emissive", light->color);
     }
-    lights.Bind(prog);
-    mesh->Draw();
+    lights.Bind(prog.GetAsset());
+    mesh.GetAsset().Draw();
 }
 
 std::shared_ptr<Object> Scene::Hit(const Ray & ray)

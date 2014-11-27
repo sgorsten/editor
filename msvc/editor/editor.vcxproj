@@ -181,6 +181,7 @@
     <ClCompile Include="..\..\src\editor\xplat.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\editor\asset.h" />
     <ClInclude Include="..\..\src\editor\gui.h" />
     <ClInclude Include="..\..\src\editor\scene.h" />
     <ClInclude Include="..\..\src\editor\widgets.h" />
