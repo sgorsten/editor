@@ -1,5 +1,6 @@
 ﻿#include "window.h"
 #include "widgets.h"
+#include "xplat.h"
 
 #include "engine/gl.h"
 #include "engine/font.h"
@@ -11,6 +12,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <fstream>
 
 struct Selection
 {
@@ -493,9 +495,12 @@ void main()
                 {"New", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_N},
                 MenuItem::Popup("Open", {
                     {"Game", [](){}},
-                    {"Level", [](){}}
+                    {"Level", [](){ auto f = ChooseFile({{"Scene files","scene"}}, true); }}
                 }),
-                {"Save", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_S},
+                {"Save", [this](){ 
+                    auto f = ChooseFile({{"Scene files","scene"}}, false);
+                    if(!f.empty()) std::ofstream(f) << tabbed(scene.ToJson(), 4);
+                }, GLFW_MOD_CONTROL, GLFW_KEY_S},
                 {"Exit", [this]() { quit = true; }, GLFW_MOD_ALT, GLFW_KEY_F4}
             }),
             MenuItem::Popup("Edit", {

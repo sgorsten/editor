@@ -178,12 +178,14 @@
     <ClCompile Include="..\..\src\editor\scene.cpp" />
     <ClCompile Include="..\..\src\editor\widgets.cpp" />
     <ClCompile Include="..\..\src\editor\window.cpp" />
+    <ClCompile Include="..\..\src\editor\xplat.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor\gui.h" />
     <ClInclude Include="..\..\src\editor\scene.h" />
     <ClInclude Include="..\..\src\editor\widgets.h" />
     <ClInclude Include="..\..\src\editor\window.h" />
+    <ClInclude Include="..\..\src\editor\xplat.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\engine\engine.vcxproj">

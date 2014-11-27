@@ -22,6 +22,7 @@
     <ClInclude Include="..\..\src\engine\font.h" />
     <ClInclude Include="..\..\src\engine\geometry.h" />
     <ClInclude Include="..\..\src\engine\gl.h" />
+    <ClInclude Include="..\..\src\engine\json.h" />
     <ClInclude Include="..\..\src\engine\linalg.h" />
     <ClInclude Include="..\..\src\engine\transform.h" />
     <ClInclude Include="..\..\src\engine\utf8.h" />
@@ -31,6 +32,7 @@
     <ClCompile Include="..\..\src\engine\font.cpp" />
     <ClCompile Include="..\..\src\engine\geometry.cpp" />
     <ClCompile Include="..\..\src\engine\gl.cpp" />
+    <ClCompile Include="..\..\src\engine\json.cpp" />
     <ClCompile Include="..\..\src\engine\transform.cpp" />
     <ClCompile Include="..\..\src\engine\utf8.cpp" />
   </ItemGroup>

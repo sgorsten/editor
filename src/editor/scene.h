@@ -3,6 +3,7 @@
 
 #include "engine/gl.h"
 #include "engine/geometry.h"
+#include "engine/json.h"
 
 #include <memory>
 #include <vector>
@@ -76,6 +77,10 @@ struct LightComponent
     float3 color;
 };
 
+inline JsonArray ToJson(const float3 & vec) { return {vec.x, vec.y, vec.z}; }
+inline JsonArray ToJson(const float4 & vec) { return {vec.x, vec.y, vec.z, vec.w}; }
+inline JsonArray ToJson(const Pose & pose) { return {ToJson(pose.position), ToJson(pose.orientation)}; }
+
 struct Object
 {
     std::string name;
@@ -100,11 +105,28 @@ struct Object
     }
 
     void Draw(const float4x4 & viewProj, const float3 & eye, const LightEnvironment & lights);
+
+    JsonValue ToJson() const
+    {
+        return JsonObject{
+            {"name", name},
+            {"pose", ::ToJson(pose)},
+            {"scale", ::ToJson(localScale)},
+            {"diffuse", ::ToJson(color)}
+        };
+    }
 };
 
 struct Scene
 {
     std::vector<std::shared_ptr<Object>> objects;
+
+    JsonValue ToJson() const
+    {
+        JsonArray objs;
+        for(auto & obj : objects) objs.push_back(obj->ToJson());
+        return JsonObject{{"objects", objs}};
+    }
 
     std::shared_ptr<Object> Hit(const Ray & ray);
 

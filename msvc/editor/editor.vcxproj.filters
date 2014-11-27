@@ -10,6 +10,7 @@
       <Filter>gui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\editor\scene.cpp" />
+    <ClCompile Include="..\..\src\editor\xplat.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor\window.h" />
@@ -20,6 +21,7 @@
       <Filter>gui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\editor\scene.h" />
+    <ClInclude Include="..\..\src\editor\xplat.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
