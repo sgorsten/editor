@@ -85,13 +85,13 @@ public:
 class AssetLibrary
 {
     std::map<std::string, std::shared_ptr<AssetRecord<Mesh>>> meshes;
-    std::map<std::string, std::shared_ptr<AssetRecord<GLuint>>> programs;
+    std::map<std::string, std::shared_ptr<AssetRecord<gl::Program>>> programs;
 public:
     AssetHandle<Mesh> RegisterMesh(std::string id, Mesh mesh) { return meshes[id] = std::make_shared<AssetRecord<Mesh>>(std::move(mesh), id); }
-    AssetHandle<GLuint> RegisterProgram(std::string id, GLuint program) { return programs[id] = std::make_shared<AssetRecord<GLuint>>(std::move(program), id); }
+    AssetHandle<gl::Program> RegisterProgram(std::string id, gl::Program program) { return programs[id] = std::make_shared<AssetRecord<gl::Program>>(std::move(program), id); }
 
     AssetHandle<Mesh> GetMesh(const std::string & id) const { auto it = meshes.find(id); return it != end(meshes) ? AssetHandle<Mesh>(it->second) : AssetHandle<Mesh>(); }
-    AssetHandle<GLuint> GetProgram(const std::string & id) const { auto it = programs.find(id); return it != end(programs) ? AssetHandle<GLuint>(it->second) : AssetHandle<GLuint>(); }
+    AssetHandle<gl::Program> GetProgram(const std::string & id) const { auto it = programs.find(id); return it != end(programs) ? AssetHandle<gl::Program>(it->second) : AssetHandle<gl::Program>(); }
 };
 
 #endif

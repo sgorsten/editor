@@ -13,6 +13,11 @@ float4x4 TranslationMatrix(const float3 & translationVec);
 float4x4 RigidTransformationMatrix(const float4 & rotationQuat, const float3 & translationVec);
 float4x4 ScaledTransformationMatrix(const float3 & scalingFactors, const float4 & rotationQuat, const float3 & translationVec);
 float4x4 PerspectiveMatrixRhGl(float verticalFieldOfViewInRadians, float aspectRatioWidthOverHeight, float nearClipDistance, float farClipDistance);
+inline float4x4 LookAtMatrixRh(const float3 & eye, const float3 & center, const float3 & up)
+{
+    auto f = norm(center - eye), s = norm(cross(f, up)), u = norm(cross(s, f));
+    return mul(transpose(float4x4({s,0},{u,0},{-f,0},{0,0,0,1})), TranslationMatrix(-eye));
+}
 
 struct Pose
 {

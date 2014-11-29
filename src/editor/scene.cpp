@@ -2,19 +2,19 @@
 
 #include <sstream>
 
-void LightEnvironment::Bind(GLuint program) const
+void LightEnvironment::Bind(const gl::Program & program) const
 {
     for(size_t i=0; i<lights.size(); ++i)
     {
         std::ostringstream ss; ss << "u_lights[" << i << "]"; auto obj = ss.str();
-        gl::Uniform(program, obj+".position", lights[i].position);
-        gl::Uniform(program, obj+".color", lights[i].color);
+        program.Uniform(obj+".position", lights[i].position);
+        program.Uniform(obj+".color", lights[i].color);
     }
     for(size_t i=lights.size(); i<8; ++i)
     {
         std::ostringstream ss; ss << "u_lights[" << i << "]"; auto obj = ss.str();
-        gl::Uniform(program, obj+".position", float3(0,0,0));
-        gl::Uniform(program, obj+".color", float3(0,0,0));
+        program.Uniform(obj+".position", float3(0,0,0));
+        program.Uniform(obj+".color", float3(0,0,0));
     }
 }
 
@@ -35,16 +35,16 @@ void Object::Draw(const float4x4 & viewProj, const float3 & eye, const LightEnvi
 {
     if(!prog.IsValid() || !mesh.IsValid()) return;
     auto model = ScaledTransformationMatrix(localScale, pose.orientation, pose.position);
-    glUseProgram(prog.GetAsset());
-    gl::Uniform(prog.GetAsset(), "u_model", model);
-    gl::Uniform(prog.GetAsset(), "u_modelIT", inv(transpose(model)));
-    gl::Uniform(prog.GetAsset(), "u_modelViewProj", mul(viewProj, model));
-    gl::Uniform(prog.GetAsset(), "u_eye", eye);
-    gl::Uniform(prog.GetAsset(), "u_diffuse", color);
-    gl::Uniform(prog.GetAsset(), "u_emissive", float3(0,0,0));
+    glUseProgram(prog.GetAsset().GetObject());
+    prog.GetAsset().Uniform("u_model", model);
+    prog.GetAsset().Uniform("u_modelIT", inv(transpose(model)));
+    prog.GetAsset().Uniform("u_modelViewProj", mul(viewProj, model));
+    prog.GetAsset().Uniform("u_eye", eye);
+    prog.GetAsset().Uniform("u_diffuse", color);
+    prog.GetAsset().Uniform("u_emissive", float3(0,0,0));
     if(light)
     {
-        gl::Uniform(prog.GetAsset(), "u_emissive", light->color);
+        prog.GetAsset().Uniform("u_emissive", light->color);
     }
     lights.Bind(prog.GetAsset());
     mesh.GetAsset().Draw();

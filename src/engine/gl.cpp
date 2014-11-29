@@ -79,12 +79,10 @@ void Texture::Load(const char * filename)
     }
 }
 
-GLuint gl::CompileShader(GLenum type, const char * source)
+static void AttachShader(GLuint program, GLenum type, const char * source)
 {
-    const char * sources[] = {source};
-
     GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, sources, nullptr);
+    glShaderSource(shader, 1, &source, nullptr);
     glCompileShader(shader);
 
     GLint status, length;
@@ -98,26 +96,29 @@ GLuint gl::CompileShader(GLenum type, const char * source)
         throw std::runtime_error(std::string("glCompileShader(...) failed with log:\n") + buffer.data());
     }
 
-    return shader;
+    glAttachShader(program, shader);
+    glDeleteShader(shader);
 }
 
-GLuint gl::LinkProgram(GLuint vertShader, GLuint fragShader)
+gl::Program::Program(const std::string & vertShader, const std::string & fragShader) : Program()
 {
-    GLuint program = glCreateProgram();
-    glAttachShader(program, vertShader);
-    glAttachShader(program, fragShader);
-    glLinkProgram(program);
+    object = glCreateProgram();
+    AttachShader(object, GL_VERTEX_SHADER, vertShader.c_str());
+    AttachShader(object, GL_FRAGMENT_SHADER, fragShader.c_str());
+    glLinkProgram(object);
 
     GLint status, length;
-    glGetProgramiv(program, GL_LINK_STATUS, &status);
+    glGetProgramiv(object, GL_LINK_STATUS, &status);
     if(status == GL_FALSE)
     {
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+        glGetProgramiv(object, GL_INFO_LOG_LENGTH, &length);
         std::vector<char> buffer(length);
-        glGetProgramInfoLog(program, length, nullptr, buffer.data());
-        glDeleteProgram(program);
+        glGetProgramInfoLog(object, length, nullptr, buffer.data());
         throw std::runtime_error(std::string("glLinkProgram(...) failed with log:\n") + buffer.data());
     }
+}
 
-    return program;
+gl::Program::~Program()
+{
+    if(object) glDeleteProgram(object);
 }

@@ -17,10 +17,10 @@
 struct Selection
 {
     std::weak_ptr<Object> object;
-    AssetHandle<GLuint> selectionProgram;
+    AssetHandle<gl::Program> selectionProgram;
 
     Mesh arrowMesh, circleMesh, scaleMesh;
-    AssetHandle<GLuint> arrowProg;
+    AssetHandle<gl::Program> arrowProg;
 
     Selection() {}
 
@@ -45,16 +45,15 @@ struct Selection
 class Raycaster
 {
     gui::Rect rect;
-    float4x4 invProj;
-    Pose viewpoint;
+    float4x4 invViewProj;
 public:
-    Raycaster(const gui::Rect & rect, const float4x4 & proj, const Pose & viewpoint) : rect(rect), invProj(inv(proj)), viewpoint(viewpoint) {}
+    Raycaster(const gui::Rect & rect, const float4x4 & proj, const Pose & viewpoint) : rect(rect), invViewProj(inv(mul(proj, LookAtMatrixRh(viewpoint.position, viewpoint.position + viewpoint.Ydir(), viewpoint.Zdir())))) {}
 
     Ray ComputeRay(const int2 & pixel) const
     {
         auto viewX = (pixel.x - rect.x0) * 2.0f / rect.GetWidth() - 1;
         auto viewY = 1 - (pixel.y - rect.y0) * 2.0f / rect.GetHeight();
-        return viewpoint * Ray::Between(TransformCoordinate(invProj, {viewX, viewY, -1}), TransformCoordinate(invProj, {viewX, viewY, 1}));
+        return Ray::Between(TransformCoordinate(invViewProj, {viewX, viewY, -1}), TransformCoordinate(invViewProj, {viewX, viewY, 1}));
     }
 };
 
@@ -188,9 +187,9 @@ struct View : public gui::Element
     void OnUpdate(float timestep)
     {
         float3 dir;
-        if(bf) dir.z -= 1;
+        if(bf) dir.y += 1;
         if(bl) dir.x -= 1;
-        if(bb) dir.z += 1;
+        if(bb) dir.y -= 1;
         if(br) dir.x += 1;
         if(mag2(dir) > 0) viewpoint.position = viewpoint.TransformCoord(norm(dir) * (timestep * 8));
     }
@@ -199,7 +198,7 @@ struct View : public gui::Element
     {
         yaw -= delta.x * 0.01f;
         pitch -= delta.y * 0.01f;
-        viewpoint.orientation = qmul(RotationQuaternionAxisAngle({0,1,0}, yaw), RotationQuaternionAxisAngle({1,0,0}, pitch));
+        viewpoint.orientation = qmul(RotationQuaternionAxisAngle({0,0,1}, yaw), RotationQuaternionAxisAngle({1,0,0}, pitch));
     }
 
     NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override
@@ -215,7 +214,9 @@ struct View : public gui::Element
         glClear(GL_COLOR_BUFFER_BIT);
 
         glEnable(GL_DEPTH_TEST);
-        auto viewProj = mul(PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f), viewpoint.Inverse().Matrix());
+        auto proj = PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f);
+        auto view = LookAtMatrixRh(viewpoint.position, viewpoint.position + viewpoint.Ydir(), viewpoint.Zdir());
+        auto viewProj = mul(proj, view);
         scene.Draw(viewProj, viewpoint.position);
 
         if(auto obj = selection.object.lock())
@@ -236,13 +237,13 @@ struct View : public gui::Element
             {
                 auto model = (obj->pose * Pose({0,0,0}, RotationQuaternionFromToVec({0,0,1}, axis))).Matrix();
                 auto color = axis * 0.4f + 0.1f;
-                glUseProgram(selection.arrowProg.GetAsset());
-                gl::Uniform(selection.arrowProg.GetAsset(), "u_model", model);
-                gl::Uniform(selection.arrowProg.GetAsset(), "u_modelIT", model);
-                gl::Uniform(selection.arrowProg.GetAsset(), "u_modelViewProj", mul(viewProj, model));
-                gl::Uniform(selection.arrowProg.GetAsset(), "u_eye", viewpoint.position);
-                gl::Uniform(selection.arrowProg.GetAsset(), "u_diffuse", color);
-                gl::Uniform(selection.arrowProg.GetAsset(), "u_emissive", color);
+                glUseProgram(selection.arrowProg.GetAsset().GetObject());
+                selection.arrowProg.GetAsset().Uniform("u_model", model);
+                selection.arrowProg.GetAsset().Uniform("u_modelIT", model);
+                selection.arrowProg.GetAsset().Uniform("u_modelViewProj", mul(viewProj, model));
+                selection.arrowProg.GetAsset().Uniform("u_eye", viewpoint.position);
+                selection.arrowProg.GetAsset().Uniform("u_diffuse", color);
+                selection.arrowProg.GetAsset().Uniform("u_emissive", color);
                 GetGizmoMesh().Draw();
             }
         }
@@ -407,7 +408,7 @@ public:
     {
         view = std::make_shared<View>(scene, selection);
 
-        auto vs = gl::CompileShader(GL_VERTEX_SHADER, R"(#version 330
+        auto vs = R"(#version 330
 uniform mat4 u_model;
 uniform mat4 u_modelIT;
 uniform mat4 u_modelViewProj;
@@ -421,9 +422,9 @@ void main()
     position = (u_model * vec4(v_position,1)).xyz;
     normal = normalize((u_modelIT * vec4(v_normal,0)).xyz);
 }
-)");
+)";
 
-        auto fs = gl::CompileShader(GL_FRAGMENT_SHADER, R"(#version 330
+        auto fs = R"(#version 330
 struct PointLight
 {
     vec3 position;
@@ -449,12 +450,10 @@ void main()
     }
     gl_FragColor = vec4(light,1);
 }
-)");
+)";
 
-        auto fs2 = gl::CompileShader(GL_FRAGMENT_SHADER, "#version 330\nvoid main() { gl_FragColor = vec4(1,1,1,1); }");
-
-        auto prog = assets.RegisterProgram("diffuse", gl::LinkProgram(vs, fs));
-        selection.selectionProgram = assets.RegisterProgram("selection", gl::LinkProgram(vs, fs2));
+        auto prog = assets.RegisterProgram("diffuse", gl::Program(vs, fs));
+        selection.selectionProgram = assets.RegisterProgram("selection", gl::Program(vs, "#version 330\nvoid main() { gl_FragColor = vec4(1,1,1,1); }"));
 
         selection.arrowMesh.AddCylinder({0,0,0}, 0.00f, {0,0,0}, 0.05f, {1,0,0}, {0,1,0}, 12);
         selection.arrowMesh.AddCylinder({0,0,0}, 0.05f, {0,0,1}, 0.05f, {1,0,0}, {0,1,0}, 12);
@@ -478,16 +477,16 @@ void main()
         selection.scaleMesh.Upload();
 
         auto mesh = assets.RegisterMesh("box", MakeBox({0.5f,0.5f,0.5f}));
-        auto ground = assets.RegisterMesh("ground", MakeBox({4,0.1f,4}));
+        auto ground = assets.RegisterMesh("ground", MakeBox({4,4,0.1f}));
         auto bulb = assets.RegisterMesh("bulb", MakeBox({0.1f,0.1f,0.1f}));
-        scene.CreateObject("Ground",{    0,-0.1f,  0},ground,prog,{0.4f,0.4f,0.4f});
-        scene.CreateObject("Alpha", {-0.6f, 0.5f,  0},mesh,prog,{1,0,0});
-        scene.CreateObject("Beta",  {+0.6f, 0.5f,  0},mesh,prog,{0,1,0});
-        scene.CreateObject("Gamma", { 0.0f, 1.5f,  0},mesh,prog,{1,1,0});
-        auto lt = scene.CreateObject("Light", { 0.0f, 3.0f,1.0},bulb,prog,{0,0,0});
+        scene.CreateObject("Ground",{    0,0,-0.1f},ground,prog,{0.4f,0.4f,0.4f});
+        scene.CreateObject("Alpha", {-0.6f,0, 0.5f},mesh,prog,{1,0,0});
+        scene.CreateObject("Beta",  {+0.6f,0, 0.5f},mesh,prog,{0,1,0});
+        scene.CreateObject("Gamma", { 0.0f,0, 1.5f},mesh,prog,{1,1,0});
+        auto lt = scene.CreateObject("Light", { 0.0f,-1.0f,3.0f},bulb,prog,{0,0,0});
         lt->light = std::make_unique<LightComponent>();
         lt->light->color = {1,1,1};
-        view->viewpoint.position = {0,1,4};
+        view->viewpoint.position = {0,-4,1};
 
         objectListPanel = std::make_shared<gui::Element>();
         propertyPanel = std::make_shared<gui::Element>();

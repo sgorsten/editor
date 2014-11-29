@@ -54,16 +54,30 @@ namespace gl
         void Load(const char * filename);
     };
 
-    GLuint CompileShader(GLenum type, const char * source);
-    GLuint LinkProgram(GLuint vertShader, GLuint fragShader);
+    class Program
+    {
+        GLuint object;
+    public:
+        Program() : object() {}
+        Program(const std::string & vertShader, const std::string & fragShader);
+        Program(Program && r) : Program() { *this = std::move(r); }
+        Program(const Program & r) = delete;
+        ~Program();
 
-    inline void Uniform(GLint location, const float4x4 & mat) { glUniformMatrix4fv(location, 1, GL_FALSE, &mat.x.x); }
-    inline void Uniform(GLint location, const float2 & vec) { glUniform2fv(location, 1, &vec.x); }
-    inline void Uniform(GLint location, const float3 & vec) { glUniform3fv(location, 1, &vec.x); }
-    inline void Uniform(GLint location, const float4 & vec) { glUniform4fv(location, 1, &vec.x); }
+        Program & operator = (Program && r) { std::swap(object, r.object); return *this; }
+        Program & operator = (const Program & r) = delete;
 
-    template<class T> void Uniform(GLuint program, const char * name, const T & value) { Uniform(glGetUniformLocation(program, name), value); }
-    template<class T> void Uniform(GLuint program, const std::string & name, const T & value) { Uniform(program, name.c_str(), value); }
+        GLuint GetObject() const { return object; }
+
+        // TODO: Deprecate all of this, so that programs are actually constant
+        void Uniform(GLint location, const float4x4 & mat) const { glUniformMatrix4fv(location, 1, GL_FALSE, &mat.x.x); }
+        void Uniform(GLint location, const float2 & vec) const { glUniform2fv(location, 1, &vec.x); }
+        void Uniform(GLint location, const float3 & vec) const { glUniform3fv(location, 1, &vec.x); }
+        void Uniform(GLint location, const float4 & vec) const { glUniform4fv(location, 1, &vec.x); }
+
+        template<class T> void Uniform(const char * name, const T & value) const { Uniform(glGetUniformLocation(object, name), value); }
+        template<class T> void Uniform(const std::string & name, const T & value) const { Uniform(name.c_str(), value); }
+    };
 }
 
 #endif

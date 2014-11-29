@@ -12,7 +12,7 @@ struct PointLight { float3 position, color; };
 struct LightEnvironment
 {
     std::vector<PointLight> lights;
-    void Bind(GLuint program) const;
+    void Bind(const gl::Program & program) const;
 };
 
 struct LightComponent
@@ -37,7 +37,7 @@ struct Object
 
     float3 color;
     AssetHandle<Mesh> mesh;
-    AssetHandle<GLuint> prog;
+    AssetHandle<gl::Program> prog;
 
     std::unique_ptr<LightComponent> light;
 
@@ -111,7 +111,7 @@ struct Scene
 
     void Draw(const float4x4 & viewProj, const float3 & eye);
 
-    std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, AssetHandle<Mesh> mesh, AssetHandle<GLuint> prog, const float3 & diffuseColor)
+    std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, AssetHandle<Mesh> mesh, AssetHandle<gl::Program> prog, const float3 & diffuseColor)
     {
         auto obj = std::make_shared<Object>();
         obj->name = name;

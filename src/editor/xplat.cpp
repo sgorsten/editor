@@ -40,7 +40,7 @@ std::string ChooseFile(const std::vector<FileType> & types, bool mustExist)
     ofn.Flags = OFN_PATHMUSTEXIST; // OFN_ALLOWMULTISELECT
     if(mustExist) ofn.Flags |= OFN_FILEMUSTEXIST; 
 
-    if (GetOpenFileName(&ofn) == TRUE)
+    if ((mustExist ? GetOpenFileName : GetSaveFileName)(&ofn) == TRUE)
     {
         size_t len = wcstombs(nullptr, buffer, 0);
         if(len == size_t(-1)) throw std::runtime_error("Invalid path.");
