@@ -28,6 +28,9 @@
     <ClInclude Include="..\..\src\engine\asset.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\engine\load.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dep\src\nanovg.c">
@@ -52,6 +55,9 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\engine\asset.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\engine\load.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>

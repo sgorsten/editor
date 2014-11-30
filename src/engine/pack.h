@@ -59,6 +59,4 @@ template<class T> T DeserializeFromJson(const JsonValue & value, AssetLibrary & 
     return object;
 }
 
-std::string LoadTextFile(const std::string & filename);
-
 #endif
