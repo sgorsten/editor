@@ -6,10 +6,10 @@
 struct Selection
 {
     std::weak_ptr<Object> object;
-    AssetHandle<gl::Program> selectionProgram;
+    ProgramHandle selectionProgram;
 
     Mesh arrowMesh, circleMesh, scaleMesh;
-    AssetHandle<gl::Program> arrowProg;
+    ProgramHandle arrowProg;
     std::function<void()> onSelectionChanged;
 
     Selection();

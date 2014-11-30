@@ -22,16 +22,16 @@ public:
     template<class T> JsonValue Save(const std::unique_ptr<T> & object) { return object ? Save(*object) : nullptr; }
     template<class T> JsonValue Save(const std::shared_ptr<T> & object) { return object ? Save(*object) : nullptr; }
     template<class T> JsonValue Save(const std::vector<T> & object) { JsonArray a; for(auto & elem : object) a.push_back(Save(elem)); return a; }
-    template<class T> JsonValue Save(const AssetHandle<T> & object) { return object.IsValid() ? object.GetId() : nullptr; }
+    template<class T> JsonValue Save(const AssetLibrary::Handle<T> & object) { return object.IsValid() ? object.GetId() : nullptr; }
     template<class T> std::enable_if_t<std::is_class<T>::value, JsonValue> Save(const T & object) { JsonObject o; VisitFields((T&)object, Visitor{*this,o}); return o; }
 };
 
 class JsonDeserializer
 {
     struct Visitor { JsonDeserializer & j; const JsonValue & value; template<class U> void operator() (const char * name, U & field) { j.Load(field, value[name]); } };
-    const AssetLibrary & assets;
+    AssetLibrary & assets;
 public:
-    JsonDeserializer(const AssetLibrary & assets) : assets(assets) {}
+    JsonDeserializer(AssetLibrary & assets) : assets(assets) {}
 
     void Load(bool & object, const JsonValue & value) { object = value.isTrue(); }
     void Load(std::string & object, const JsonValue & value) { object = value.string(); }
@@ -43,7 +43,7 @@ public:
     template<class T> void Load(std::unique_ptr<T> & object, const JsonValue & value) { if(value.isObject()) { object = std::make_unique<T>(); Load(*object, value); } else object.reset(); }
     template<class T> void Load(std::shared_ptr<T> & object, const JsonValue & value) { if(value.isObject()) { object = std::make_shared<T>(); Load(*object, value); } else object.reset(); }
     template<class T> void Load(std::vector<T> & object, const JsonValue & value) { object.clear(); object.resize(value.array().size()); for(size_t i=0; i<object.size(); ++i) Load(object[i], value[i]); }
-    template<class T> void Load(AssetHandle<T> & object, const JsonValue & value) { assets.Get(object, value.string()); }
+    template<class T> void Load(AssetLibrary::Handle<T> & object, const JsonValue & value) { object = assets.GetAsset<T>(value.string()); }
     template<class T> std::enable_if_t<std::is_class<T>::value, void> Load(T & object, const JsonValue & value) { VisitFields(object, Visitor{*this,value}); }
 };
 
@@ -52,11 +52,13 @@ template<class T> JsonValue SerializeToJson(const T & object)
     return JsonSerializer().Save(object);
 }
 
-template<class T> T DeserializeFromJson(const JsonValue & value, const AssetLibrary & assets)
+template<class T> T DeserializeFromJson(const JsonValue & value, AssetLibrary & assets)
 {
     T object;
     JsonDeserializer(assets).Load(object, value);
     return object;
 }
+
+std::string LoadTextFile(const std::string & filename);
 
 #endif

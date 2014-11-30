@@ -309,7 +309,23 @@ void View::OnDrag(const int2 & delta)
 // Editor //
 ////////////
 
-const char * const shaderPrelude = R"(#version 330
+static Mesh MakeBox(const float3 & halfDims)
+{
+    Mesh mesh;
+    mesh.AddBox(-halfDims, +halfDims);
+    mesh.ComputeNormals();
+    mesh.Upload();
+    return mesh;
+}
+
+#include <fstream>
+#include <iostream>
+
+Editor::Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), quit()
+{
+    assets.RegisterLoader<gl::Program>([](const std::string & id) -> gl::Program
+    {
+        std::string shaderPrelude = R"(#version 330
 struct PointLight
 {
     vec3 position;
@@ -326,24 +342,16 @@ layout(binding = 2) uniform PerView
 };
 )";
 
-static Mesh MakeBox(const float3 & halfDims)
-{
-    Mesh mesh;
-    mesh.AddBox(-halfDims, +halfDims);
-    mesh.ComputeNormals();
-    mesh.Upload();
-    return mesh;
-}
+        auto source = LoadTextFile("../assets/" + id + ".glsl");
+        auto vs = shaderPrelude + "#define VERT_SHADER\n" + source;
+        auto fs = shaderPrelude + "#define FRAG_SHADER\n" + source;
+        return gl::Program(vs, fs);
+    });
 
-#include <fstream>
-#include <iostream>
-
-Editor::Editor() : window("Editor", 1280, 720), assets(shaderPrelude), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), quit()
-{
     view = std::make_shared<View>(scene, selection);
 
-    auto prog = assets.LoadProgram("simple");
-    selection.selectionProgram = assets.LoadProgram("white");
+    auto prog = assets.GetAsset<gl::Program>("simple");
+    selection.selectionProgram = assets.GetAsset<gl::Program>("white");
 
     for(auto & block : prog.GetAsset().GetBlocks())
     {
@@ -375,9 +383,9 @@ Editor::Editor() : window("Editor", 1280, 720), assets(shaderPrelude), font(wind
     selection.scaleMesh.ComputeNormals();
     selection.scaleMesh.Upload();
 
-    auto mesh = assets.RegisterMesh("box", MakeBox({0.5f,0.5f,0.5f}));
-    auto ground = assets.RegisterMesh("ground", MakeBox({4,4,0.1f}));
-    auto bulb = assets.RegisterMesh("bulb", MakeBox({0.1f,0.1f,0.1f}));
+    auto mesh = assets.RegisterAsset("box", MakeBox({0.5f,0.5f,0.5f}));
+    auto ground = assets.RegisterAsset("ground", MakeBox({4,4,0.1f}));
+    auto bulb = assets.RegisterAsset("bulb", MakeBox({0.1f,0.1f,0.1f}));
     scene.CreateObject("Ground",{    0,0,-0.1f},ground,prog,{0.4f,0.4f,0.4f});
     scene.CreateObject("Alpha", {-0.6f,0, 0.5f},mesh,prog,{1,0,0});
     scene.CreateObject("Beta",  {+0.6f,0, 0.5f},mesh,prog,{0,1,0});
@@ -451,7 +459,7 @@ void Editor::RefreshMenu()
         }),
         MenuItem::Popup("Object", {
             {"New", [this]() { 
-                scene.CreateObject("New Object", {0,0,0}, assets.GetMesh("box"), assets.GetProgram("diffuse"), {1,1,1});
+                scene.CreateObject("New Object", {0,0,0}, assets.GetAsset<Mesh>("box"), assets.GetAsset<gl::Program>("diffuse"), {1,1,1});
                 RefreshObjectList();
             }},
             {"Duplicate", [this]() { 
