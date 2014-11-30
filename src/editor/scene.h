@@ -7,10 +7,7 @@
 
 #include <vector>
 
-struct Vertex
-{
-    float3 position, normal;
-};
+struct Vertex { float3 position, normal; float2 texCoord; };
 
 struct Mesh
 {
@@ -118,12 +115,13 @@ struct Scene
 
     void Draw(RenderContext & ctx);
 
-    std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, MeshHandle mesh, ProgramHandle prog, const float3 & diffuseColor)
+    std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, const float3 & scale, MeshHandle mesh, ProgramHandle prog, const float3 & diffuseColor)
     {
         auto obj = std::make_shared<Object>();
         obj->name = name;
         obj->pose.position = position;
         obj->pose.orientation = {0,0,0,1};
+        obj->localScale = scale;
         obj->mesh = mesh;
         obj->prog = prog;
         obj->color = diffuseColor;

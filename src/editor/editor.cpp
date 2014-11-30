@@ -149,6 +149,7 @@ NVGcolor View::OnDrawBackground(const gui::DrawEvent & e) const
     glClear(GL_COLOR_BUFFER_BIT);
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
     auto proj = PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f);
     auto view = LookAtMatrixRh(viewpoint.position, viewpoint.position + viewpoint.Ydir(), viewpoint.Zdir());
     auto viewProj = mul(proj, view);
@@ -319,10 +320,96 @@ static Mesh MakeBox(const float3 & halfDims)
 }
 
 #include <fstream>
+#include <sstream>
 #include <iostream>
+
+Mesh LoadMeshFromObj(const std::string & filepath)
+{
+    std::vector<Vertex> vertices;
+    std::map<std::string, size_t> indices;
+    std::vector<uint3> triangles;
+
+    std::vector<float4> positions;
+    std::vector<float3> texCoords, normals;
+
+    std::string line;
+    std::ifstream in(filepath);
+    while(in)
+    {
+        std::getline(in, line);
+        if(!in) break;
+        
+        std::istringstream inLine(line);
+        std::string token;
+        inLine >> token;
+        if(token == "v")
+        {
+            float4 position = {0,0,0,1};
+            inLine >> position.x >> position.y >> position.z >> position.w;
+            positions.push_back(position);
+        }
+        if(token == "vt")
+        {
+            float3 texCoord = {0,0,0};
+            inLine >> texCoord.x >> texCoord.y >> texCoord.z;
+            texCoords.push_back(texCoord);
+        }
+        if(token == "vn")
+        {
+            float3 normal = {0,0,0};
+            inLine >> normal.x >> normal.y >> normal.z;
+            normals.push_back(normal);
+        }
+
+        if(token == "f")
+        {
+            std::vector<size_t> faceIndices;
+            while(inLine)
+            {
+                inLine >> token;
+                if(!inLine) break;
+                auto it = indices.find(token);
+                if(it != end(indices))
+                {
+                    faceIndices.push_back(it->second);
+                    continue;
+                }
+                indices[token] = vertices.size();
+                faceIndices.push_back(vertices.size());
+
+                Vertex vertex;
+                bool skipTexCoords = token.find("//") != std::string::npos;
+                for(auto & ch : token) if(ch == '/') ch = ' ';
+                int i0=0, i1=0, i2=0;
+                std::istringstream(token) >> i0 >> i1 >> i2;
+                if(skipTexCoords) std::swap(i1, i2);
+                if(i0) vertex.position = positions[i0-1].xyz();
+                if(i1) vertex.texCoord = texCoords[i1-1].xy();
+                if(i2) vertex.normal = normals[i2-1];
+                vertices.push_back(vertex);                
+            }
+
+            for(size_t i=2; i<faceIndices.size(); ++i)
+            {
+                triangles.push_back({faceIndices[0], faceIndices[i-1], faceIndices[i]});
+            }
+        }
+    }
+
+    Mesh mesh;
+    mesh.vertices = vertices;
+    mesh.triangles = triangles;
+    mesh.Upload();
+    return mesh;
+}
 
 Editor::Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), quit()
 {
+    assets.SetLoader<Mesh>([](const std::string & id) -> Mesh
+    {
+        return LoadMeshFromObj("../assets/"+id+".obj");
+    });
+
     assets.SetLoader<gl::Program>([](const std::string & id) -> gl::Program
     {
         std::string shaderPrelude = R"(#version 330
@@ -383,14 +470,12 @@ layout(binding = 2) uniform PerView
     selection.scaleMesh.ComputeNormals();
     selection.scaleMesh.Upload();
 
-    auto mesh = assets.AddAsset("box", MakeBox({0.5f,0.5f,0.5f}));
-    auto ground = assets.AddAsset("ground", MakeBox({4,4,0.1f}));
-    auto bulb = assets.AddAsset("bulb", MakeBox({0.1f,0.1f,0.1f}));
-    scene.CreateObject("Ground",{    0,0,-0.1f},ground,prog,{0.4f,0.4f,0.4f});
-    scene.CreateObject("Alpha", {-0.6f,0, 0.5f},mesh,prog,{1,0,0});
-    scene.CreateObject("Beta",  {+0.6f,0, 0.5f},mesh,prog,{0,1,0});
-    scene.CreateObject("Gamma", { 0.0f,0, 1.5f},mesh,prog,{1,1,0});
-    auto lt = scene.CreateObject("Light", { 0.0f,-1.0f,3.0f},bulb,prog,{0,0,0});
+    auto cube = assets.GetAsset<Mesh>("cube");
+    scene.CreateObject("Ground",{    0,0,-0.1f},{4,4,0.1f},cube,prog,{0.4f,0.4f,0.4f});
+    scene.CreateObject("Alpha", {-0.6f,0, 0.5f},{0.5f,0.5f,0.5f},cube,prog,{1,0,0});
+    scene.CreateObject("Beta",  {+0.6f,0, 0.5f},{0.5f,0.5f,0.5f},cube,prog,{0,1,0});
+    scene.CreateObject("Gamma", { 0.0f,0, 1.5f},{0.5f,0.5f,0.5f},cube,prog,{1,1,0});
+    auto lt = scene.CreateObject("Light", { 0.0f,-1.0f,3.0f},{0.1f,0.1f,0.1f},cube,prog,{0,0,0});
     lt->light = std::make_unique<LightComponent>();
     lt->light->color = {1,1,1};
     view->viewpoint.position = {0,-4,1};
@@ -459,7 +544,7 @@ void Editor::RefreshMenu()
         }),
         MenuItem::Popup("Object", {
             {"New", [this]() { 
-                scene.CreateObject("New Object", {0,0,0}, assets.GetAsset<Mesh>("box"), assets.GetAsset<gl::Program>("diffuse"), {1,1,1});
+                scene.CreateObject("New Object", {0,0,0}, {0.5f,0.5f,0.5f}, assets.GetAsset<Mesh>("cube"), assets.GetAsset<gl::Program>("diffuse"), {1,1,1});
                 RefreshObjectList();
             }},
             {"Duplicate", [this]() { 
