@@ -438,10 +438,7 @@ uniform PerScene
 {
     PointLight u_lights[8];
 };
-uniform PerView
-{
-    vec3 u_eye;
-};
+uniform vec3 u_eye;
 uniform vec3 u_emissive;
 uniform vec3 u_diffuse;
 in vec3 position;
