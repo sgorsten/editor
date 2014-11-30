@@ -111,19 +111,10 @@ namespace gl
         Program & operator = (Program && r) { std::swap(object, r.object); blocks.swap(r.blocks); return *this; }
         Program & operator = (const Program & r) = delete;
 
-        GLuint GetObject() const { return object; }
         const std::vector<BlockDesc> & GetBlocks() const { return blocks; }
         const BlockDesc * GetDefaultBlock(const std::string & name) const { for(auto & block : blocks) if(block.binding == -1) return &block; return nullptr; }
         const BlockDesc * GetNamedBlock(const std::string & name) const { for(auto & block : blocks) if(block.name == name) return &block; return nullptr; }
-
-        // TODO: Deprecate all of this, so that programs are actually constant
-        void Uniform(GLint location, const float4x4 & mat) const { glUniformMatrix4fv(location, 1, GL_FALSE, &mat.x.x); }
-        void Uniform(GLint location, const float2 & vec) const { glUniform2fv(location, 1, &vec.x); }
-        void Uniform(GLint location, const float3 & vec) const { glUniform3fv(location, 1, &vec.x); }
-        void Uniform(GLint location, const float4 & vec) const { glUniform4fv(location, 1, &vec.x); }
-
-        template<class T> void Uniform(const char * name, const T & value) const { Uniform(glGetUniformLocation(object, name), value); }
-        template<class T> void Uniform(const std::string & name, const T & value) const { Uniform(name.c_str(), value); }
+        void Use() const { glUseProgram(object); }
     };
 }
 

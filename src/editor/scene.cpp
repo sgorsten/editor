@@ -41,17 +41,13 @@ void Object::Draw()
         std::vector<GLubyte> data(b->dataSize);
         b->SetUniform(data.data(), "u_model", model);
         b->SetUniform(data.data(), "u_modelIT", inv(transpose(model)));
+        b->SetUniform(data.data(), "u_diffuse", color);
+        if(light) b->SetUniform(data.data(), "u_emissive", light->color);
         buf.SetData(GL_UNIFORM_BUFFER, data.size(), data.data(), GL_STREAM_DRAW);
         buf.BindBase(GL_UNIFORM_BUFFER, b->binding);
     }
     
-    glUseProgram(prog.GetAsset().GetObject());
-    prog.GetAsset().Uniform("u_diffuse", color);
-    prog.GetAsset().Uniform("u_emissive", float3(0,0,0));
-    if(light)
-    {
-        prog.GetAsset().Uniform("u_emissive", light->color);
-    }
+    prog.GetAsset().Use();
     mesh.GetAsset().Draw();
 }
 

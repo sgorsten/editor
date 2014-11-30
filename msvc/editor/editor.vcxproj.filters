@@ -11,6 +11,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\editor\scene.cpp" />
     <ClCompile Include="..\..\src\editor\xplat.cpp" />
+    <ClCompile Include="..\..\src\editor\editor.cpp">
+      <Filter>gui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\editor\window.h" />
@@ -22,14 +25,25 @@
     </ClInclude>
     <ClInclude Include="..\..\src\editor\scene.h" />
     <ClInclude Include="..\..\src\editor\xplat.h" />
-    <ClInclude Include="..\..\src\editor\asset.h" />
+    <ClInclude Include="..\..\src\editor\editor.h">
+      <Filter>gui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="..\..\assets\simple.glsl">
+      <Filter>assets</Filter>
+    </None>
+    <None Include="..\..\assets\white.glsl">
+      <Filter>assets</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="gui">
       <UniqueIdentifier>{7939bdf6-7f5c-43e5-bdef-5a43ee8582bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="assets">
+      <UniqueIdentifier>{9b04b349-671e-4a37-88e6-63a4c226cc6b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

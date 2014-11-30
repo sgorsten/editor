@@ -3,8 +3,7 @@
 
 #include "engine/gl.h"
 #include "engine/geometry.h"
-#include "engine/json.h"
-#include "asset.h"
+#include "engine/pack.h"
 
 #include <vector>
 
@@ -19,15 +18,6 @@ struct LightComponent
 {
     float3 color;
 };
-
-inline JsonArray ToJson(const float3 & obj) { return {obj.x, obj.y, obj.z}; }
-inline JsonArray ToJson(const float4 & obj) { return {obj.x, obj.y, obj.z, obj.w}; }
-inline JsonArray ToJson(const Pose & obj) { return {ToJson(obj.position), ToJson(obj.orientation)}; }
-
-inline void FromJson(const JsonValue & val, float & obj) { obj = val.number<float>(); }
-inline void FromJson(const JsonValue & val, float3 & obj) { FromJson(val[0], obj.x); FromJson(val[1], obj.y); FromJson(val[2], obj.z); }
-inline void FromJson(const JsonValue & val, float4 & obj) { FromJson(val[0], obj.x); FromJson(val[1], obj.y); FromJson(val[2], obj.z); FromJson(val[3], obj.w); }
-inline void FromJson(const JsonValue & val, Pose & obj) { FromJson(val[0], obj.position); FromJson(val[1], obj.orientation); }
 
 struct Object
 {
@@ -54,35 +44,6 @@ struct Object
     }
 
     void Draw();
-
-    JsonValue ToJson() const
-    {
-        auto obj = JsonObject{
-            {"name", name},
-            {"pose", ::ToJson(pose)},
-            {"scale", ::ToJson(localScale)},
-            {"diffuse", ::ToJson(color)}
-        };
-        if(mesh.IsValid()) obj.push_back({"mesh", mesh.GetId()});
-        if(prog.IsValid()) obj.push_back({"prog", prog.GetId()});
-        if(light) obj.push_back({"light", JsonObject{{"color", ::ToJson(light->color)}}});
-        return obj;
-    }
-
-    void FromJson(const AssetLibrary & lib, const JsonValue & val)
-    {
-        name = val["name"].string();
-        ::FromJson(val["pose"], pose);
-        ::FromJson(val["scale"], localScale);
-        ::FromJson(val["diffuse"], color);
-        mesh = lib.GetMesh(val["mesh"].string());
-        prog = lib.GetProgram(val["prog"].string());
-        if(val["light"].isObject())
-        {
-            light = std::make_unique<LightComponent>();
-            ::FromJson(val["light"]["color"], light->color);
-        }
-    }
 };
 
 struct RenderContext
@@ -94,23 +55,9 @@ struct Scene
 {
     std::vector<std::shared_ptr<Object>> objects;
 
-    JsonValue ToJson() const
-    {
-        JsonArray objs;
-        for(auto & obj : objects) objs.push_back(obj->ToJson());
-        return JsonObject{{"objects", objs}};
-    }
+    JsonValue ToJson() const;
 
-    void FromJson(const AssetLibrary & lib, const JsonValue & val)
-    {
-        objects.clear();
-        for(auto & elem : val["objects"].array())
-        {
-            auto obj = std::make_shared<Object>();
-            obj->FromJson(lib, elem);
-            objects.push_back(obj);
-        }
-    }
+    void FromJson(const AssetLibrary & lib, const JsonValue & val);
 
     std::shared_ptr<Object> Hit(const Ray & ray);
 
@@ -143,6 +90,37 @@ struct Scene
     }
 };
 
+template<class F> void VisitFields(LightComponent & o, F f)
+{
+    f("color", o.color);
+}
 
+template<class F> void VisitFields(Object & o, F f)
+{
+    f("name", o.name);
+    f("pose", o.pose);
+    f("scale", o.localScale);
+    f("diffuse", o.color);
+    f("mesh", o.mesh);
+    f("prog", o.prog);
+    f("light", o.light);
+}
+
+template<class F> void VisitFields(Scene & o, F f)
+{
+    f("objects", o.objects);
+}
+
+inline JsonValue Scene::ToJson() const
+{
+    JsonSerializer j;
+    return j.Save(*this);
+}
+
+inline void Scene::FromJson(const AssetLibrary & lib, const JsonValue & val)
+{
+    JsonDeserializer j(lib);
+    j.Load(*this, val);
+}
 
 #endif

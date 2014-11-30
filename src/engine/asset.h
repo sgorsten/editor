@@ -1,7 +1,8 @@
 #ifndef EDITOR_ASSET_H
 #define EDITOR_ASSET_H
 
-#include "engine/gl.h"
+#include "gl.h"
+#include "geometry.h"
 
 #include <memory>
 #include <string>
@@ -82,16 +83,31 @@ public:
     const std::string & GetId() const { return record->id; }
 };
 
+std::string LoadTextFile(const std::string & filename);
+
 class AssetLibrary
 {
+    std::string shaderPrelude;
     std::map<std::string, std::shared_ptr<AssetRecord<Mesh>>> meshes;
     std::map<std::string, std::shared_ptr<AssetRecord<gl::Program>>> programs;
 public:
-    AssetHandle<Mesh> RegisterMesh(std::string id, Mesh mesh) { return meshes[id] = std::make_shared<AssetRecord<Mesh>>(std::move(mesh), id); }
-    AssetHandle<gl::Program> RegisterProgram(std::string id, gl::Program program) { return programs[id] = std::make_shared<AssetRecord<gl::Program>>(std::move(program), id); }
+    AssetLibrary(std::string shaderPrelude) : shaderPrelude(move(shaderPrelude)) {}
 
     AssetHandle<Mesh> GetMesh(const std::string & id) const { auto it = meshes.find(id); return it != end(meshes) ? AssetHandle<Mesh>(it->second) : AssetHandle<Mesh>(); }
     AssetHandle<gl::Program> GetProgram(const std::string & id) const { auto it = programs.find(id); return it != end(programs) ? AssetHandle<gl::Program>(it->second) : AssetHandle<gl::Program>(); }
+
+    AssetHandle<Mesh> RegisterMesh(std::string id, Mesh mesh) { return meshes[id] = std::make_shared<AssetRecord<Mesh>>(std::move(mesh), id); }
+    AssetHandle<gl::Program> RegisterProgram(std::string id, gl::Program program) { return programs[id] = std::make_shared<AssetRecord<gl::Program>>(std::move(program), id); }
+    AssetHandle<gl::Program> LoadProgram(std::string id)
+    {
+        auto source = LoadTextFile("../assets/" + id + ".glsl");
+        auto vs = shaderPrelude + "#define VERT_SHADER\n" + source;
+        auto fs = shaderPrelude + "#define FRAG_SHADER\n" + source;
+        return RegisterProgram(id, gl::Program(vs, fs));
+    }
+
+    void Get(AssetHandle<Mesh> & handle, const std::string & id) const { handle = GetMesh(id); }
+    void Get(AssetHandle<gl::Program> & handle, const std::string & id) const { handle = GetProgram(id); }
 };
 
 #endif

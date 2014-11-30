@@ -127,13 +127,14 @@ gl::Program::Program(const std::string & vertShader, const std::string & fragSha
     for(GLuint index = 0; index < activeUniforms; ++index)
     {
         GLint blockIndex;
-        UniformDesc uniform;
-        glGetActiveUniform(object, index, nameBuffer.size(), nullptr, &uniform.size, &uniform.type, nameBuffer.data());
         glGetActiveUniformsiv(object, 1, &index, GL_UNIFORM_BLOCK_INDEX, &blockIndex);
+        if(blockIndex == -1) continue;
+
+        UniformDesc uniform;
+        glGetActiveUniform(object, index, nameBuffer.size(), nullptr, &uniform.size, &uniform.type, nameBuffer.data());       
         glGetActiveUniformsiv(object, 1, &index, GL_UNIFORM_OFFSET, &uniform.offset);
         glGetActiveUniformsiv(object, 1, &index, GL_UNIFORM_ARRAY_STRIDE, &uniform.arrayStride);
         glGetActiveUniformsiv(object, 1, &index, GL_UNIFORM_MATRIX_STRIDE, &uniform.matrixStride);
-        if(blockIndex == -1) uniform.offset = index;
         uniform.name = nameBuffer.data();
         blocks[blockIndex].uniforms.push_back(uniform);
     }
@@ -142,16 +143,12 @@ gl::Program::Program(const std::string & vertShader, const std::string & fragSha
     for(auto & pair : blocks)
     {
         GLint nameLength;
-        if(pair.first == -1) pair.second.binding = -1;
-        else
-        {
-            glGetActiveUniformBlockiv(object, pair.first, GL_UNIFORM_BLOCK_BINDING, &pair.second.binding);
-            glGetActiveUniformBlockiv(object, pair.first, GL_UNIFORM_BLOCK_DATA_SIZE, &pair.second.dataSize);
-            glGetActiveUniformBlockiv(object, pair.first, GL_UNIFORM_BLOCK_NAME_LENGTH, &nameLength);
-            nameBuffer.resize(nameLength);
-            glGetActiveUniformBlockName(object, pair.first, nameBuffer.size(), nullptr, nameBuffer.data());
-            pair.second.name = nameBuffer.data();
-        }
+        glGetActiveUniformBlockiv(object, pair.first, GL_UNIFORM_BLOCK_BINDING, &pair.second.binding);
+        glGetActiveUniformBlockiv(object, pair.first, GL_UNIFORM_BLOCK_DATA_SIZE, &pair.second.dataSize);
+        glGetActiveUniformBlockiv(object, pair.first, GL_UNIFORM_BLOCK_NAME_LENGTH, &nameLength);
+        nameBuffer.resize(nameLength);
+        glGetActiveUniformBlockName(object, pair.first, nameBuffer.size(), nullptr, nameBuffer.data());
+        pair.second.name = nameBuffer.data();
         this->blocks.push_back(std::move(pair.second));
     }
 }

@@ -173,6 +173,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\editor\editor.cpp" />
     <ClCompile Include="..\..\src\editor\gui.cpp" />
     <ClCompile Include="..\..\src\editor\main.cpp" />
     <ClCompile Include="..\..\src\editor\scene.cpp" />
@@ -181,7 +182,7 @@
     <ClCompile Include="..\..\src\editor\xplat.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\editor\asset.h" />
+    <ClInclude Include="..\..\src\editor\editor.h" />
     <ClInclude Include="..\..\src\editor\gui.h" />
     <ClInclude Include="..\..\src\editor\scene.h" />
     <ClInclude Include="..\..\src\editor\widgets.h" />
@@ -194,6 +195,8 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\assets\simple.glsl" />
+    <None Include="..\..\assets\white.glsl" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -22,6 +22,12 @@
     <ClInclude Include="..\..\src\engine\utf8.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\engine\pack.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\engine\asset.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dep\src\nanovg.c">
@@ -43,6 +49,9 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\engine\utf8.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\engine\asset.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
