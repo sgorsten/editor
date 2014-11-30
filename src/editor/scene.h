@@ -12,7 +12,7 @@ struct PointLight { float3 position, color; };
 struct LightEnvironment
 {
     std::vector<PointLight> lights;
-    void Bind(GLuint buffer, const gl::BlockDesc & perScene) const;
+    void Bind(gl::Buffer & buffer, const gl::BlockDesc & perScene) const;
 };
 
 struct LightComponent
@@ -87,7 +87,7 @@ struct Object
 
 struct RenderContext
 {
-    GLuint perSceneBuffer;
+    gl::Buffer perScene;
 };
 
 struct Scene
@@ -114,7 +114,7 @@ struct Scene
 
     std::shared_ptr<Object> Hit(const Ray & ray);
 
-    void Draw(const RenderContext & ctx, const float4x4 & viewProj, const float3 & eye);
+    void Draw(RenderContext & ctx, const float4x4 & viewProj, const float3 & eye);
 
     std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, AssetHandle<Mesh> mesh, AssetHandle<gl::Program> prog, const float3 & diffuseColor)
     {

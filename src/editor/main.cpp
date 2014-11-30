@@ -219,8 +219,6 @@ struct View : public gui::Element
         auto viewProj = mul(proj, view);
     
         RenderContext ctx;
-        glGenBuffers(1, &ctx.perSceneBuffer);
-
         scene.Draw(ctx, viewProj, viewpoint.position);
 
         if(auto obj = selection.object.lock())
@@ -440,7 +438,10 @@ uniform PerScene
 {
     PointLight u_lights[8];
 };
-uniform vec3 u_eye;
+uniform PerView
+{
+    vec3 u_eye;
+};
 uniform vec3 u_emissive;
 uniform vec3 u_diffuse;
 in vec3 position;

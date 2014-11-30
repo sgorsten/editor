@@ -2,7 +2,7 @@
 
 #include <sstream>
 
-void LightEnvironment::Bind(GLuint buffer, const gl::BlockDesc & perScene) const
+void LightEnvironment::Bind(gl::Buffer & buffer, const gl::BlockDesc & perScene) const
 {
     std::vector<GLubyte> dataBuffer(perScene.dataSize);    
     for(size_t i=0; i<lights.size(); ++i)
@@ -12,9 +12,8 @@ void LightEnvironment::Bind(GLuint buffer, const gl::BlockDesc & perScene) const
         perScene.SetUniform(dataBuffer.data(), obj+".color", lights[i].color);
     }
 
-	glBindBuffer(GL_UNIFORM_BUFFER, buffer);
-	glBufferData(GL_UNIFORM_BUFFER, dataBuffer.size(), dataBuffer.data(), GL_STREAM_DRAW);
-    glBindBufferBase(GL_UNIFORM_BUFFER, perScene.index, buffer);
+    buffer.SetData(GL_UNIFORM_BUFFER, dataBuffer.size(), dataBuffer.data(), GL_STREAM_DRAW);
+    buffer.BindBase(GL_UNIFORM_BUFFER, perScene.index);
 }
 
 void Mesh::Upload()
@@ -64,12 +63,11 @@ std::shared_ptr<Object> Scene::Hit(const Ray & ray)
     return best;
 }
 
-void Scene::Draw(const RenderContext & ctx, const float4x4 & viewProj, const float3 & eye)
+void Scene::Draw(RenderContext & ctx, const float4x4 & viewProj, const float3 & eye)
 {
     LightEnvironment lights;
     for(auto & obj : objects) if(obj->light) lights.lights.push_back({obj->pose.position, obj->light->color});
-
-    if(!objects.empty()) lights.Bind(ctx.perSceneBuffer, *objects[0]->prog.GetAsset().GetNamedBlock("PerScene"));
+    if(!objects.empty()) lights.Bind(ctx.perScene, *objects[0]->prog.GetAsset().GetNamedBlock("PerScene"));
 
     for(auto & obj : objects) obj->Draw(viewProj, eye);
 }

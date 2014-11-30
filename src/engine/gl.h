@@ -15,6 +15,28 @@ namespace gl
     inline GLenum GetType(uint32_t *) { return GL_UNSIGNED_INT; }
     inline GLenum GetType(float *) { return GL_FLOAT; }
 
+    class Buffer
+    {
+        GLuint object;
+    public:
+        Buffer() : object() {}
+        Buffer(Buffer && r) : Buffer() { *this = std::move(r); }
+        Buffer(const Buffer & r) = delete;
+        ~Buffer() { if(object) glDeleteBuffers(1, &object); }
+
+        void BindBase(GLenum target, GLuint index) const { glBindBufferBase(target, index, object); }
+
+        Buffer & operator = (Buffer && r) { std::swap(object, r.object); return *this; }
+        Buffer & operator = (const Buffer & r) = delete;
+
+        void SetData(GLenum target, GLsizeiptr size, GLvoid * data, GLenum usage)
+        {
+            if(!object) glGenBuffers(1, &object);
+            glBindBuffer(target, object);
+            glBufferData(target, size, data, usage);
+        }
+    };
+
     class Mesh
     {
         GLuint vertexArray, arrayBuffer, elementBuffer;
