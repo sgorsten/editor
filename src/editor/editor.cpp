@@ -323,7 +323,7 @@ static Mesh MakeBox(const float3 & halfDims)
 
 Editor::Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), quit()
 {
-    assets.RegisterLoader<gl::Program>([](const std::string & id) -> gl::Program
+    assets.SetLoader<gl::Program>([](const std::string & id) -> gl::Program
     {
         std::string shaderPrelude = R"(#version 330
 struct PointLight
@@ -383,9 +383,9 @@ layout(binding = 2) uniform PerView
     selection.scaleMesh.ComputeNormals();
     selection.scaleMesh.Upload();
 
-    auto mesh = assets.RegisterAsset("box", MakeBox({0.5f,0.5f,0.5f}));
-    auto ground = assets.RegisterAsset("ground", MakeBox({4,4,0.1f}));
-    auto bulb = assets.RegisterAsset("bulb", MakeBox({0.1f,0.1f,0.1f}));
+    auto mesh = assets.AddAsset("box", MakeBox({0.5f,0.5f,0.5f}));
+    auto ground = assets.AddAsset("ground", MakeBox({4,4,0.1f}));
+    auto bulb = assets.AddAsset("bulb", MakeBox({0.1f,0.1f,0.1f}));
     scene.CreateObject("Ground",{    0,0,-0.1f},ground,prog,{0.4f,0.4f,0.4f});
     scene.CreateObject("Alpha", {-0.6f,0, 0.5f},mesh,prog,{1,0,0});
     scene.CreateObject("Beta",  {+0.6f,0, 0.5f},mesh,prog,{0,1,0});

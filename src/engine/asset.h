@@ -15,14 +15,16 @@ class AssetLibrary
         std::shared_ptr<void> asset;
     };
 
-    struct List
-    {
-        std::function<std::shared_ptr<void>(const std::string & id)> loader;
-        std::map<std::string, std::shared_ptr<Record>> assets;
-    };
-
+    struct List;
     std::map<std::type_index, List> lists;
+
+    void SetLoader(const std::type_info & type, std::function<std::shared_ptr<void>(const std::string & id)> loader);
+    std::shared_ptr<Record> AddAsset(const std::type_info & type, const std::string & id, std::shared_ptr<void> asset);
+    std::shared_ptr<Record> GetAsset(const std::type_info & type, const std::string & id);
 public:
+    AssetLibrary();
+    ~AssetLibrary();
+
     template<class T> class Handle
     {
         std::shared_ptr<const Record> record;
@@ -35,36 +37,9 @@ public:
         const std::string & GetId() const { return record->id; }
     };
 
-    template<class T, class F> void RegisterLoader(F load) { lists[typeid(T)].loader = [load](const std::string & id) { return std::make_shared<T>(load(id)); }; }
-
-    template<class T> Handle<T> RegisterAsset(const std::string & id, T && asset) 
-    { 
-        auto r = std::make_shared<Record>();
-        r->id = id;
-        r->asset = std::make_shared<T>(std::move(asset));
-        lists[typeid(T)].assets[id] = r;
-        return r;
-    }
-
-    template<class T> Handle<T> GetAsset(const std::string & id)
-    {
-        auto it = lists.find(typeid(T));
-        if(it != end(lists))
-        {
-            auto it2 = it->second.assets.find(id);
-            if(it2 != end(it->second.assets)) return it2->second;
-
-            if(it->second.loader)
-            {
-                auto r = std::make_shared<Record>();
-                r->id = id;
-                r->asset = it->second.loader(id);
-                it->second.assets[id] = r;
-                return r;
-            }
-        }
-        return {};
-    }
+    template<class T, class F> void SetLoader(F load) { SetLoader(typeid(T), [load](const std::string & id) { return std::make_shared<T>(load(id)); }); }
+    template<class T> Handle<T> AddAsset(const std::string & id, T && asset) { return AddAsset(typeid(T), id, std::make_shared<T>(std::move(asset))); }
+    template<class T> Handle<T> GetAsset(const std::string & id) { return GetAsset(typeid(T), id); }
 };
 
 #endif
