@@ -13,7 +13,7 @@ void LightEnvironment::Bind(gl::Buffer & buffer, const gl::BlockDesc & perScene)
     }
 
     buffer.SetData(GL_UNIFORM_BUFFER, dataBuffer.size(), dataBuffer.data(), GL_STREAM_DRAW);
-    buffer.BindBase(GL_UNIFORM_BUFFER, perScene.index);
+    buffer.BindBase(GL_UNIFORM_BUFFER, perScene.binding);
 }
 
 void Mesh::Upload()
@@ -32,10 +32,20 @@ void Mesh::Draw() const
 void Object::Draw()
 {
     if(!prog.IsValid() || !mesh.IsValid()) return;
+
     auto model = ScaledTransformationMatrix(localScale, pose.orientation, pose.position);
+
+    gl::Buffer buf;
+    if(auto b = prog.GetAsset().GetNamedBlock("PerObject"))
+    {
+        std::vector<GLubyte> data(b->dataSize);
+        b->SetUniform(data.data(), "u_model", model);
+        b->SetUniform(data.data(), "u_modelIT", inv(transpose(model)));
+        buf.SetData(GL_UNIFORM_BUFFER, data.size(), data.data(), GL_STREAM_DRAW);
+        buf.BindBase(GL_UNIFORM_BUFFER, b->binding);
+    }
+    
     glUseProgram(prog.GetAsset().GetObject());
-    prog.GetAsset().Uniform("u_model", model);
-    prog.GetAsset().Uniform("u_modelIT", inv(transpose(model)));
     prog.GetAsset().Uniform("u_diffuse", color);
     prog.GetAsset().Uniform("u_emissive", float3(0,0,0));
     if(light)

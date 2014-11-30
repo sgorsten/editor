@@ -84,12 +84,13 @@ namespace gl
         GLenum type;
 
         void SetValue(uint8_t * data, const float3 & value) const { if(type == GL_FLOAT_VEC3) reinterpret_cast<float3 &>(data[offset]) = value; }
+        void SetValue(uint8_t * data, const float4x4 & value) const { if(type == GL_FLOAT_MAT4) reinterpret_cast<float4x4 &>(data[offset]) = value; }
     };
 
     struct BlockDesc
     {
         std::string name;
-        GLint index, dataSize;
+        GLint binding, dataSize;
         std::vector<UniformDesc> uniforms;
 
         const UniformDesc * GetNamedUniform(const std::string & name) const { for(auto & uniform : uniforms) if(uniform.name == name) return &uniform; return nullptr; }
@@ -112,7 +113,7 @@ namespace gl
 
         GLuint GetObject() const { return object; }
         const std::vector<BlockDesc> & GetBlocks() const { return blocks; }
-        const BlockDesc * GetDefaultBlock(const std::string & name) const { for(auto & block : blocks) if(block.index == -1) return &block; return nullptr; }
+        const BlockDesc * GetDefaultBlock(const std::string & name) const { for(auto & block : blocks) if(block.binding == -1) return &block; return nullptr; }
         const BlockDesc * GetNamedBlock(const std::string & name) const { for(auto & block : blocks) if(block.name == name) return &block; return nullptr; }
 
         // TODO: Deprecate all of this, so that programs are actually constant

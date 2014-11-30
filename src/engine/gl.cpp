@@ -142,10 +142,10 @@ gl::Program::Program(const std::string & vertShader, const std::string & fragSha
     for(auto & pair : blocks)
     {
         GLint nameLength;
-        pair.second.index = pair.first;
-        if(pair.first == -1) pair.second.dataSize = 0;
+        if(pair.first == -1) pair.second.binding = -1;
         else
         {
+            glGetActiveUniformBlockiv(object, pair.first, GL_UNIFORM_BLOCK_BINDING, &pair.second.binding);
             glGetActiveUniformBlockiv(object, pair.first, GL_UNIFORM_BLOCK_DATA_SIZE, &pair.second.dataSize);
             glGetActiveUniformBlockiv(object, pair.first, GL_UNIFORM_BLOCK_NAME_LENGTH, &nameLength);
             nameBuffer.resize(nameLength);

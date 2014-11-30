@@ -218,9 +218,15 @@ struct View : public gui::Element
         auto view = LookAtMatrixRh(viewpoint.position, viewpoint.position + viewpoint.Ydir(), viewpoint.Zdir());
         auto viewProj = mul(proj, view);
     
-        glUseProgram(selection.arrowProg.GetAsset().GetObject());
-        selection.arrowProg.GetAsset().Uniform("u_eye", viewpoint.position);
-        selection.arrowProg.GetAsset().Uniform("u_viewProj", viewProj);
+        gl::Buffer buf;
+        if(auto b = selection.arrowProg.GetAsset().GetNamedBlock("PerView"))
+        {
+            std::vector<GLubyte> data(b->dataSize);
+            b->SetUniform(data.data(), "u_eye", viewpoint.position);
+            b->SetUniform(data.data(), "u_viewProj", viewProj);
+            buf.SetData(GL_UNIFORM_BUFFER, data.size(), data.data(), GL_STREAM_DRAW);
+            buf.BindBase(GL_UNIFORM_BUFFER, b->binding);
+        }
 
         RenderContext ctx;
         scene.Draw(ctx);
@@ -243,9 +249,18 @@ struct View : public gui::Element
             {
                 auto model = (obj->pose * Pose({0,0,0}, RotationQuaternionFromToVec({0,0,1}, axis))).Matrix();
                 auto color = axis * 0.4f + 0.1f;
+
+                gl::Buffer buf;
+                if(auto b = selection.arrowProg.GetAsset().GetNamedBlock("PerObject"))
+                {
+                    std::vector<GLubyte> data(b->dataSize);
+                    b->SetUniform(data.data(), "u_model", model);
+                    b->SetUniform(data.data(), "u_modelIT", inv(transpose(model)));
+                    buf.SetData(GL_UNIFORM_BUFFER, data.size(), data.data(), GL_STREAM_DRAW);
+                    buf.BindBase(GL_UNIFORM_BUFFER, b->binding);
+                }
+
                 glUseProgram(selection.arrowProg.GetAsset().GetObject());
-                selection.arrowProg.GetAsset().Uniform("u_model", model);
-                selection.arrowProg.GetAsset().Uniform("u_modelIT", model);
                 selection.arrowProg.GetAsset().Uniform("u_diffuse", color);
                 selection.arrowProg.GetAsset().Uniform("u_emissive", color);
                 GetGizmoMesh().Draw();
@@ -415,9 +430,16 @@ public:
         view = std::make_shared<View>(scene, selection);
 
         auto vs = R"(#version 330
-uniform mat4 u_model;
-uniform mat4 u_modelIT;
-uniform mat4 u_viewProj;
+layout(binding = 1) uniform PerObject
+{
+    mat4 u_model;
+    mat4 u_modelIT;
+};
+layout(binding = 2) uniform PerView
+{
+    mat4 u_viewProj;
+    vec3 u_eye;
+};
 layout(location = 0) in vec3 v_position;
 layout(location = 1) in vec3 v_normal;
 out vec3 position;
@@ -436,11 +458,15 @@ struct PointLight
     vec3 position;
     vec3 color;
 };
-uniform PerScene
+layout(binding = 0) uniform PerScene
 {
     PointLight u_lights[8];
 };
-uniform vec3 u_eye;
+layout(binding = 2) uniform PerView
+{
+    mat4 u_viewProj;
+    vec3 u_eye;
+};
 uniform vec3 u_emissive;
 uniform vec3 u_diffuse;
 in vec3 position;
@@ -466,7 +492,7 @@ void main()
 
         for(auto & block : prog.GetAsset().GetBlocks())
         {
-            std::cout << "Block " << block.index << ": " << block.name << " (" << block.dataSize << " B)" << std::endl;
+            std::cout << "Block " << block.binding << ": " << block.name << " (" << block.dataSize << " B)" << std::endl;
             for(auto & uniform : block.uniforms)
             {
                 std::cout << "  " << uniform.offset << ": " << uniform.name << " : " << uniform.type << "[" << uniform.size << "] " << uniform.arrayStride << "/" << uniform.matrixStride << std::endl;
