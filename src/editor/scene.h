@@ -14,10 +14,8 @@ struct LightEnvironment
     void Bind(gl::Buffer & buffer, const gl::BlockDesc & perScene) const;
 };
 
-struct LightComponent
-{
-    float3 color;
-};
+struct LightComponent { float3 color; };
+template<class F> void VisitFields(LightComponent & o, F f) { f("color", o.color); }
 
 struct Object
 {
@@ -45,6 +43,7 @@ struct Object
 
     void Draw();
 };
+template<class F> void VisitFields(Object & o, F f) { f("name", o.name); f("pose", o.pose); f("scale", o.localScale); f("diffuse", o.color); f("mesh", o.mesh); f("prog", o.prog); f("light", o.light); }
 
 struct RenderContext
 {
@@ -54,10 +53,6 @@ struct RenderContext
 struct Scene
 {
     std::vector<std::shared_ptr<Object>> objects;
-
-    JsonValue ToJson() const;
-
-    void FromJson(const AssetLibrary & lib, const JsonValue & val);
 
     std::shared_ptr<Object> Hit(const Ray & ray);
 
@@ -89,38 +84,6 @@ struct Scene
         if(it != end(objects)) objects.erase(it);
     }
 };
-
-template<class F> void VisitFields(LightComponent & o, F f)
-{
-    f("color", o.color);
-}
-
-template<class F> void VisitFields(Object & o, F f)
-{
-    f("name", o.name);
-    f("pose", o.pose);
-    f("scale", o.localScale);
-    f("diffuse", o.color);
-    f("mesh", o.mesh);
-    f("prog", o.prog);
-    f("light", o.light);
-}
-
-template<class F> void VisitFields(Scene & o, F f)
-{
-    f("objects", o.objects);
-}
-
-inline JsonValue Scene::ToJson() const
-{
-    JsonSerializer j;
-    return j.Save(*this);
-}
-
-inline void Scene::FromJson(const AssetLibrary & lib, const JsonValue & val)
-{
-    JsonDeserializer j(lib);
-    j.Load(*this, val);
-}
+template<class F> void VisitFields(Scene & o, F f) { f("objects", o.objects); }
 
 #endif

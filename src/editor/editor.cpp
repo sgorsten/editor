@@ -434,13 +434,13 @@ void Editor::RefreshMenu()
                 {"Level", [this](){ 
                     auto f = ChooseFile({{"Scene files","scene"}}, true);
                     if(f.empty()) return;
-                    scene.FromJson(assets, jsonFrom(LoadTextFile(f)));
+                    scene = DeserializeFromJson<Scene>(jsonFrom(LoadTextFile(f)), assets);
                     RefreshObjectList();
                 }}
             }),
             {"Save", [this](){ 
                 auto f = ChooseFile({{"Scene files","scene"}}, false);
-                if(!f.empty()) std::ofstream(f, std::ofstream::binary) << tabbed(scene.ToJson(), 4);
+                if(!f.empty()) std::ofstream(f, std::ofstream::binary) << tabbed(SerializeToJson(scene), 4);
             }, GLFW_MOD_CONTROL, GLFW_KEY_S},
             {"Exit", [this]() { quit = true; }, GLFW_MOD_ALT, GLFW_KEY_F4}
         }),

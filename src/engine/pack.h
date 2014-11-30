@@ -47,4 +47,16 @@ public:
     template<class T> std::enable_if_t<std::is_class<T>::value, void> Load(T & object, const JsonValue & value) { VisitFields(object, Visitor{*this,value}); }
 };
 
+template<class T> JsonValue SerializeToJson(const T & object)
+{
+    return JsonSerializer().Save(object);
+}
+
+template<class T> T DeserializeFromJson(const JsonValue & value, const AssetLibrary & assets)
+{
+    T object;
+    JsonDeserializer(assets).Load(object, value);
+    return object;
+}
+
 #endif
