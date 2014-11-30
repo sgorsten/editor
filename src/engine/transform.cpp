@@ -31,3 +31,9 @@ float4x4 PerspectiveMatrixRhGl(float verticalFieldOfViewInRadians, float aspectR
     const auto yf = 1/std::tan(verticalFieldOfViewInRadians/2), xf = yf/aspectRatioWidthOverHeight, dz = nearClipDistance-farClipDistance;
     return {{xf,0,0,0}, {0,yf,0,0}, {0,0,(nearClipDistance+farClipDistance)/dz,-1}, {0,0,2*nearClipDistance*farClipDistance/dz,0}};
 }
+
+float4x4 LookAtMatrixRh(const float3 & eye, const float3 & center, const float3 & up)
+{
+    auto f = norm(center - eye), s = norm(cross(f, up)), u = norm(cross(s, f));
+    return mul(transpose(float4x4({s,0},{u,0},{-f,0},{0,0,0,1})), TranslationMatrix(-eye));
+}

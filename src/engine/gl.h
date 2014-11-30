@@ -54,9 +54,30 @@ namespace gl
         void Load(const char * filename);
     };
 
+    struct UniformDesc
+    {
+        std::string name;
+        GLint offset;
+        GLint size, arrayStride, matrixStride;
+        GLenum type;
+
+        void SetValue(uint8_t * data, const float3 & value) const { if(type == GL_FLOAT_VEC3) reinterpret_cast<float3 &>(data[offset]) = value; }
+    };
+
+    struct BlockDesc
+    {
+        std::string name;
+        GLint index, dataSize;
+        std::vector<UniformDesc> uniforms;
+
+        const UniformDesc * GetNamedUniform(const std::string & name) const { for(auto & uniform : uniforms) if(uniform.name == name) return &uniform; return nullptr; }
+        template<class T> void SetUniform(uint8_t * data, const std::string & name, const T & value) const { if(auto u = GetNamedUniform(name)) u->SetValue(data, value); }
+    };
+
     class Program
     {
         GLuint object;
+        std::vector<BlockDesc> blocks;
     public:
         Program() : object() {}
         Program(const std::string & vertShader, const std::string & fragShader);
@@ -64,10 +85,13 @@ namespace gl
         Program(const Program & r) = delete;
         ~Program();
 
-        Program & operator = (Program && r) { std::swap(object, r.object); return *this; }
+        Program & operator = (Program && r) { std::swap(object, r.object); blocks.swap(r.blocks); return *this; }
         Program & operator = (const Program & r) = delete;
 
         GLuint GetObject() const { return object; }
+        const std::vector<BlockDesc> & GetBlocks() const { return blocks; }
+        const BlockDesc * GetDefaultBlock(const std::string & name) const { for(auto & block : blocks) if(block.index == -1) return &block; return nullptr; }
+        const BlockDesc * GetNamedBlock(const std::string & name) const { for(auto & block : blocks) if(block.name == name) return &block; return nullptr; }
 
         // TODO: Deprecate all of this, so that programs are actually constant
         void Uniform(GLint location, const float4x4 & mat) const { glUniformMatrix4fv(location, 1, GL_FALSE, &mat.x.x); }

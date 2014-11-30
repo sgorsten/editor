@@ -12,7 +12,7 @@ struct PointLight { float3 position, color; };
 struct LightEnvironment
 {
     std::vector<PointLight> lights;
-    void Bind(const gl::Program & program) const;
+    void Bind(GLuint buffer, const gl::BlockDesc & perScene) const;
 };
 
 struct LightComponent
@@ -53,7 +53,7 @@ struct Object
         return mesh.GetAsset().Hit(localRay); 
     }
 
-    void Draw(const float4x4 & viewProj, const float3 & eye, const LightEnvironment & lights);
+    void Draw(const float4x4 & viewProj, const float3 & eye);
 
     JsonValue ToJson() const
     {
@@ -85,6 +85,11 @@ struct Object
     }
 };
 
+struct RenderContext
+{
+    GLuint perSceneBuffer;
+};
+
 struct Scene
 {
     std::vector<std::shared_ptr<Object>> objects;
@@ -109,7 +114,7 @@ struct Scene
 
     std::shared_ptr<Object> Hit(const Ray & ray);
 
-    void Draw(const float4x4 & viewProj, const float3 & eye);
+    void Draw(const RenderContext & ctx, const float4x4 & viewProj, const float3 & eye);
 
     std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, AssetHandle<Mesh> mesh, AssetHandle<gl::Program> prog, const float3 & diffuseColor)
     {

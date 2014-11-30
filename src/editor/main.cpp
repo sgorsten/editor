@@ -217,7 +217,11 @@ struct View : public gui::Element
         auto proj = PerspectiveMatrixRhGl(1, rect.GetAspect(), 0.25f, 32.0f);
         auto view = LookAtMatrixRh(viewpoint.position, viewpoint.position + viewpoint.Ydir(), viewpoint.Zdir());
         auto viewProj = mul(proj, view);
-        scene.Draw(viewProj, viewpoint.position);
+    
+        RenderContext ctx;
+        glGenBuffers(1, &ctx.perSceneBuffer);
+
+        scene.Draw(ctx, viewProj, viewpoint.position);
 
         if(auto obj = selection.object.lock())
         {
@@ -228,7 +232,7 @@ struct View : public gui::Element
             glPolygonOffset(-1, -1);
             auto prog = obj->prog;
             obj->prog = selection.selectionProgram;
-            obj->Draw(viewProj, viewpoint.position, {});
+            obj->Draw(viewProj, viewpoint.position);
             obj->prog = prog;
             glPopAttrib();
 
@@ -336,6 +340,8 @@ std::string LoadTextFile(const std::string & filename)
     return contents;
 }
 
+#include <iostream>
+
 class Editor
 {
     Window                  window;      
@@ -430,7 +436,10 @@ struct PointLight
     vec3 position;
     vec3 color;
 };
-uniform PointLight u_lights[8];
+uniform PerScene
+{
+    PointLight u_lights[8];
+};
 uniform vec3 u_eye;
 uniform vec3 u_emissive;
 uniform vec3 u_diffuse;
@@ -454,6 +463,15 @@ void main()
 
         auto prog = assets.RegisterProgram("diffuse", gl::Program(vs, fs));
         selection.selectionProgram = assets.RegisterProgram("selection", gl::Program(vs, "#version 330\nvoid main() { gl_FragColor = vec4(1,1,1,1); }"));
+
+        for(auto & block : prog.GetAsset().GetBlocks())
+        {
+            std::cout << "Block " << block.index << ": " << block.name << " (" << block.dataSize << " B)" << std::endl;
+            for(auto & uniform : block.uniforms)
+            {
+                std::cout << "  " << uniform.offset << ": " << uniform.name << " : " << uniform.type << "[" << uniform.size << "] " << uniform.arrayStride << "/" << uniform.matrixStride << std::endl;
+            }
+        }
 
         selection.arrowMesh.AddCylinder({0,0,0}, 0.00f, {0,0,0}, 0.05f, {1,0,0}, {0,1,0}, 12);
         selection.arrowMesh.AddCylinder({0,0,0}, 0.05f, {0,0,1}, 0.05f, {1,0,0}, {0,1,0}, 12);
