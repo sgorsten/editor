@@ -29,15 +29,13 @@ void Mesh::Draw() const
     glMesh.Draw();
 }
 
-void Object::Draw(const float4x4 & viewProj, const float3 & eye)
+void Object::Draw()
 {
     if(!prog.IsValid() || !mesh.IsValid()) return;
     auto model = ScaledTransformationMatrix(localScale, pose.orientation, pose.position);
     glUseProgram(prog.GetAsset().GetObject());
     prog.GetAsset().Uniform("u_model", model);
     prog.GetAsset().Uniform("u_modelIT", inv(transpose(model)));
-    prog.GetAsset().Uniform("u_modelViewProj", mul(viewProj, model));
-    prog.GetAsset().Uniform("u_eye", eye);
     prog.GetAsset().Uniform("u_diffuse", color);
     prog.GetAsset().Uniform("u_emissive", float3(0,0,0));
     if(light)
@@ -63,11 +61,11 @@ std::shared_ptr<Object> Scene::Hit(const Ray & ray)
     return best;
 }
 
-void Scene::Draw(RenderContext & ctx, const float4x4 & viewProj, const float3 & eye)
+void Scene::Draw(RenderContext & ctx)
 {
     LightEnvironment lights;
     for(auto & obj : objects) if(obj->light) lights.lights.push_back({obj->pose.position, obj->light->color});
     if(!objects.empty()) lights.Bind(ctx.perScene, *objects[0]->prog.GetAsset().GetNamedBlock("PerScene"));
 
-    for(auto & obj : objects) obj->Draw(viewProj, eye);
+    for(auto & obj : objects) obj->Draw();
 }

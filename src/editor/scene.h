@@ -53,7 +53,7 @@ struct Object
         return mesh.GetAsset().Hit(localRay); 
     }
 
-    void Draw(const float4x4 & viewProj, const float3 & eye);
+    void Draw();
 
     JsonValue ToJson() const
     {
@@ -114,7 +114,7 @@ struct Scene
 
     std::shared_ptr<Object> Hit(const Ray & ray);
 
-    void Draw(RenderContext & ctx, const float4x4 & viewProj, const float3 & eye);
+    void Draw(RenderContext & ctx);
 
     std::shared_ptr<Object> CreateObject(std::string name, const float3 & position, AssetHandle<Mesh> mesh, AssetHandle<gl::Program> prog, const float3 & diffuseColor)
     {

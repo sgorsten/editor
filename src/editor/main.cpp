@@ -218,8 +218,12 @@ struct View : public gui::Element
         auto view = LookAtMatrixRh(viewpoint.position, viewpoint.position + viewpoint.Ydir(), viewpoint.Zdir());
         auto viewProj = mul(proj, view);
     
+        glUseProgram(selection.arrowProg.GetAsset().GetObject());
+        selection.arrowProg.GetAsset().Uniform("u_eye", viewpoint.position);
+        selection.arrowProg.GetAsset().Uniform("u_viewProj", viewProj);
+
         RenderContext ctx;
-        scene.Draw(ctx, viewProj, viewpoint.position);
+        scene.Draw(ctx);
 
         if(auto obj = selection.object.lock())
         {
@@ -230,7 +234,7 @@ struct View : public gui::Element
             glPolygonOffset(-1, -1);
             auto prog = obj->prog;
             obj->prog = selection.selectionProgram;
-            obj->Draw(viewProj, viewpoint.position);
+            obj->Draw();
             obj->prog = prog;
             glPopAttrib();
 
@@ -242,8 +246,6 @@ struct View : public gui::Element
                 glUseProgram(selection.arrowProg.GetAsset().GetObject());
                 selection.arrowProg.GetAsset().Uniform("u_model", model);
                 selection.arrowProg.GetAsset().Uniform("u_modelIT", model);
-                selection.arrowProg.GetAsset().Uniform("u_modelViewProj", mul(viewProj, model));
-                selection.arrowProg.GetAsset().Uniform("u_eye", viewpoint.position);
                 selection.arrowProg.GetAsset().Uniform("u_diffuse", color);
                 selection.arrowProg.GetAsset().Uniform("u_emissive", color);
                 GetGizmoMesh().Draw();
@@ -415,14 +417,14 @@ public:
         auto vs = R"(#version 330
 uniform mat4 u_model;
 uniform mat4 u_modelIT;
-uniform mat4 u_modelViewProj;
+uniform mat4 u_viewProj;
 layout(location = 0) in vec3 v_position;
 layout(location = 1) in vec3 v_normal;
 out vec3 position;
 out vec3 normal;
 void main()
 {
-    gl_Position = u_modelViewProj * vec4(v_position,1);
+    gl_Position = u_viewProj * u_model * vec4(v_position,1);
     position = (u_model * vec4(v_position,1)).xyz;
     normal = normalize((u_modelIT * vec4(v_normal,0)).xyz);
 }
