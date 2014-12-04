@@ -22,7 +22,7 @@ public:
     template<class T> JsonValue Save(const std::unique_ptr<T> & object) { return object ? Save(*object) : nullptr; }
     template<class T> JsonValue Save(const std::shared_ptr<T> & object) { return object ? Save(*object) : nullptr; }
     template<class T> JsonValue Save(const std::vector<T> & object) { JsonArray a; for(auto & elem : object) a.push_back(Save(elem)); return a; }
-    template<class T> JsonValue Save(const AssetLibrary::Handle<T> & object) { return object.IsValid() ? object.GetId() : nullptr; }
+    template<class T> JsonValue Save(const AssetLibrary::Handle<T> & object) { return object ? object.GetId() : nullptr; }
     template<class T> std::enable_if_t<std::is_class<T>::value, JsonValue> Save(const T & object) { JsonObject o; VisitFields((T&)object, Visitor{*this,o}); return o; }
 };
 

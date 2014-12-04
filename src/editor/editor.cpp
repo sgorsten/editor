@@ -155,7 +155,7 @@ NVGcolor View::OnDrawBackground(const gui::DrawEvent & e) const
     auto viewProj = mul(proj, view);
     
     gl::Buffer buf;
-    if(auto b = selection.arrowProg.GetAsset().GetNamedBlock("PerView"))
+    if(auto b = selection.arrowProg->GetNamedBlock("PerView"))
     {
         std::vector<GLubyte> data(b->dataSize);
         b->SetUniform(data.data(), "u_eye", viewpoint.position);
@@ -187,7 +187,7 @@ NVGcolor View::OnDrawBackground(const gui::DrawEvent & e) const
             auto color = axis * 0.4f + 0.1f;
 
             gl::Buffer buf;
-            if(auto b = selection.arrowProg.GetAsset().GetNamedBlock("PerObject"))
+            if(auto b = selection.arrowProg->GetNamedBlock("PerObject"))
             {
                 std::vector<GLubyte> data(b->dataSize);
                 b->SetUniform(data.data(), "u_model", model);
@@ -198,7 +198,7 @@ NVGcolor View::OnDrawBackground(const gui::DrawEvent & e) const
                 buf.BindBase(GL_UNIFORM_BUFFER, b->binding);
             }
 
-            selection.arrowProg.GetAsset().Use();
+            selection.arrowProg->Use();
             GetGizmoMesh().Draw();
         }
     }
@@ -360,7 +360,7 @@ layout(binding = 2) uniform PerView
     auto prog = assets.GetAsset<gl::Program>("simple");
     selection.selectionProgram = assets.GetAsset<gl::Program>("white");
 
-    for(auto & block : prog.GetAsset().GetBlocks())
+    for(auto & block : prog->GetBlocks())
     {
         std::cout << "Block " << block.binding << ": " << block.name << " (" << block.dataSize << " B)" << std::endl;
         for(auto & uniform : block.uniforms)
@@ -390,15 +390,6 @@ layout(binding = 2) uniform PerView
     selection.scaleMesh.ComputeNormals();
     selection.scaleMesh.Upload();
 
-    auto cube = assets.GetAsset<Mesh>("cube");
-    auto teapot = assets.GetAsset<Mesh>("teapot");
-    scene.CreateObject("Ground",{    0,0,-0.1f},{4,4,0.1f},cube,prog,{0.4f,0.4f,0.4f});
-    scene.CreateObject("Red Box", {-0.6f,0, 0.5f},{0.5f,0.5f,0.5f},cube,prog,{1,0,0});
-    scene.CreateObject("Green Box",  {+0.6f,0, 0.5f},{0.5f,0.5f,0.5f},cube,prog,{0,1,0});
-    scene.CreateObject("Teapot", { 0.0f,0, 1.0f},{0.25f,0.25f,0.25f},teapot,prog,{1,1,0});
-    auto lt = scene.CreateObject("Light", { 0.0f,-1.0f,3.0f},{0.1f,0.1f,0.1f},cube,prog,{0,0,0});
-    lt->light = std::make_unique<LightComponent>();
-    lt->light->color = {1,1,1};
     view->viewpoint.position = {0,-4,1};
 
     objectListPanel = std::make_shared<gui::Element>();
@@ -407,8 +398,6 @@ layout(binding = 2) uniform PerView
     auto bottomRightPanel = Border::CreateBigBorder(propertyPanel);
     auto rightPanel = std::make_shared<Splitter>(bottomRightPanel, topRightPanel, Splitter::Top, 200);
     mainPanel = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
-        
-    RefreshObjectList();
             
     selection.onSelectionChanged = [this]()
     {
@@ -416,7 +405,8 @@ layout(binding = 2) uniform PerView
         objectList->SetSelectedIndex(it != end(scene.objects) ? it - begin(scene.objects) : -1);
         RefreshPropertyPanel();
     };
-    selection.onSelectionChanged();
+
+    LoadScene("../assets/test.scene");
 
     RefreshMenu();
 }
@@ -438,6 +428,12 @@ int Editor::Run()
     return 0;
 }
 
+void Editor::LoadScene(const std::string & filepath)
+{
+    scene = DeserializeFromJson<Scene>(jsonFrom(LoadTextFile(filepath)), assets);
+    RefreshObjectList();
+}
+
 void Editor::RefreshMenu()
 {
     window.SetGuiRoot(mainPanel, font, std::vector<MenuItem>{
@@ -448,8 +444,7 @@ void Editor::RefreshMenu()
                 {"Level", [this](){ 
                     auto f = ChooseFile({{"Scene files","scene"}}, true);
                     if(f.empty()) return;
-                    scene = DeserializeFromJson<Scene>(jsonFrom(LoadTextFile(f)), assets);
-                    RefreshObjectList();
+                    LoadScene(f);
                 }}
             }),
             {"Save", [this](){ 

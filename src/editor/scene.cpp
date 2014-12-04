@@ -31,12 +31,12 @@ void Mesh::Draw() const
 
 void Object::Draw()
 {
-    if(!prog.IsValid() || !mesh.IsValid()) return;
+    if(!prog || !mesh) return;
 
     auto model = ScaledTransformationMatrix(localScale, pose.orientation, pose.position);
 
     gl::Buffer buf;
-    if(auto b = prog.GetAsset().GetNamedBlock("PerObject"))
+    if(auto b = prog->GetNamedBlock("PerObject"))
     {
         std::vector<GLubyte> data(b->dataSize);
         b->SetUniform(data.data(), "u_model", model);
@@ -47,8 +47,8 @@ void Object::Draw()
         buf.BindBase(GL_UNIFORM_BUFFER, b->binding);
     }
     
-    prog.GetAsset().Use();
-    mesh.GetAsset().Draw();
+    prog->Use();
+    mesh->Draw();
 }
 
 std::shared_ptr<Object> Scene::Hit(const Ray & ray)
@@ -71,7 +71,7 @@ void Scene::Draw(RenderContext & ctx)
 {
     LightEnvironment lights;
     for(auto & obj : objects) if(obj->light) lights.lights.push_back({obj->pose.position, obj->light->color});
-    if(!objects.empty()) lights.Bind(ctx.perScene, *objects[0]->prog.GetAsset().GetNamedBlock("PerScene"));
+    if(!objects.empty()) lights.Bind(ctx.perScene, *objects[0]->prog->GetNamedBlock("PerScene"));
 
     for(auto & obj : objects) obj->Draw();
 }

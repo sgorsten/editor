@@ -182,7 +182,7 @@ public:
     }
     template<class T> gui::ElementPtr MakeAssetHandleEdit(AssetLibrary & assets, AssetLibrary::Handle<T> & value) const
     {
-        return MakeEdit(value.IsValid() ? value.GetId() : "{None}", [&assets, &value](const std::string & text) 
+        return MakeEdit(value ? value.GetId() : "{None}", [&assets, &value](const std::string & text) 
         {
             value = assets.GetAsset<T>(text);
         });

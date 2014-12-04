@@ -58,6 +58,7 @@ class Editor
 
     bool                    quit;
 
+    void LoadScene(const std::string & filepath);
     void RefreshMenu();
     void RefreshObjectList();
     void RefreshPropertyPanel();

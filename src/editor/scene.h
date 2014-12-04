@@ -35,11 +35,11 @@ struct Object
 
     RayMeshHit Hit(const Ray & ray) const
     { 
-        if(!mesh.IsValid()) return RayMeshHit({false}, 0);
+        if(!mesh) return RayMeshHit({false}, 0);
         auto localRay = pose.Inverse() * ray;
         localRay.start /= localScale;
         localRay.direction /= localScale;
-        return mesh.GetAsset().Hit(localRay); 
+        return mesh->Hit(localRay); 
     }
 
     void Draw();

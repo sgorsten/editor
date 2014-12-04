@@ -30,11 +30,6 @@ namespace gui
 
     enum class Cursor { Arrow, IBeam, SizeNS, SizeWE };
 
-    struct Color
-    {
-        float r,g,b,a;
-    };
-
     struct Rect
     {
         int x0,y0,x1,y1;
@@ -79,10 +74,16 @@ namespace gui
         bool isMouseOver;   // True if the mouse is presently over this element
     };
 
-    struct Element;
-    typedef std::shared_ptr<Element> ElementPtr;
+    typedef std::shared_ptr<struct Element> ElementPtr;
+
     struct Element
     {
+        struct Child
+        {
+            URect placement;
+            ElementPtr element;
+        };
+
         Rect                                                rect;
         std::vector<Child>                                  children;
         bool                                                isVisible;
@@ -105,12 +106,6 @@ namespace gui
         virtual bool                                        OnKey(GLFWwindow * window, int key, int action, int mods) { return false; }
         virtual DraggerPtr                                  OnClick(const MouseEvent & e) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
         virtual void                                        OnTab() {}
-    };
-
-    struct Child
-    {
-        URect placement;
-        ElementPtr element;
     };
 }
 

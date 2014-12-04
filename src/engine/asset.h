@@ -32,9 +32,15 @@ public:
         Handle() {}
         Handle(const std::shared_ptr<const Record> & record) : record(record) {}
 
-        bool IsValid() const { return record && record->asset; }
-        const T & GetAsset() const { return *reinterpret_cast<const T *>(record->asset.get()); }
-        const std::string & GetId() const { return record->id; }
+        operator bool () const { return record && record->asset; }
+        bool operator == (const Handle & r) const { return record == r.record; }
+        bool operator != (const Handle & r) const { return record != r.record; }
+
+        bool operator ! () const { return !record || !record->asset; }
+        const T & operator * () const { return *reinterpret_cast<const T *>(record->asset.get()); }
+        const T * operator -> () const { return reinterpret_cast<const T *>(record->asset.get()); }
+
+        const std::string & GetId() const { static const std::string empty; return record ? record->id : empty; }
     };
 
     template<class T, class F> void SetLoader(F load) { SetLoader(typeid(T), [load](const std::string & id) { return std::make_shared<T>(load(id)); }); }
