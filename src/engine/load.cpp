@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-Mesh LoadMeshFromObj(const std::string & filepath)
+Mesh LoadMeshFromObj(const std::string & filepath, bool swapYZ)
 {
     std::vector<Vertex> vertices;
     std::map<std::string, size_t> indices;
@@ -44,7 +44,7 @@ Mesh LoadMeshFromObj(const std::string & filepath)
 
         if(token == "f")
         {
-            std::vector<size_t> faceIndices;
+            std::vector<uint32_t> faceIndices;
             while(inLine)
             {
                 inLine >> token;
@@ -77,25 +77,37 @@ Mesh LoadMeshFromObj(const std::string & filepath)
         }
     }
 
+    if(swapYZ)
+    {
+        for(auto & vert : vertices)
+        {
+            std::swap(vert.position.y, vert.position.z);
+            std::swap(vert.normal.y, vert.normal.z);
+        }
+        for(auto & tri : triangles)
+        {
+            std::swap(tri.y, tri.z);
+        }
+    }
+
     Mesh mesh;
-    mesh.vertices = vertices;
-    mesh.triangles = triangles;
+    mesh.vertices = std::move(vertices);
+    mesh.triangles = std::move(triangles);
+    if(normals.empty()) mesh.ComputeNormals();
     mesh.Upload();
     return mesh;
 }
 
 std::string LoadTextFile(const std::string & filename)
 {
-    std::string contents;
     FILE * f = fopen(filename.c_str(), "rb");
-    if(f)
-    {
-        fseek(f, 0, SEEK_END);
-        auto len = ftell(f);
-        contents.resize(len);
-        fseek(f, 0, SEEK_SET);
-        fread(&contents[0], 1, contents.size(), f);
-        fclose(f);
-    }
+    if(!f) throw std::runtime_error("File not found: " + filename);
+    fseek(f, 0, SEEK_END);
+    auto len = ftell(f);
+    std::string contents((size_t)len, ' ');
+    contents.resize(len);
+    fseek(f, 0, SEEK_SET);
+    fread(&contents[0], 1, contents.size(), f);
+    fclose(f);
     return contents;
 }

@@ -35,14 +35,14 @@ struct Mesh
 
     void AddCylinder(const float3 & center0, float radius0, const float3 & center1, float radius1, const float3 & axisA, const float3 & axisB, int segments)
     {
-        auto base = vertices.size();
+        uint32_t base = vertices.size();
         for(uint32_t i=0, n=segments; i<n; ++i)
         {
             const float angle = i*6.28f/segments;
             auto dir = axisA * std::cos(angle) + axisB * std::sin(angle);
             vertices.push_back({center0 + dir*radius0, dir});
             vertices.push_back({center1 + dir*radius1, dir});
-            auto i0 = i*2, i1 = i0 + 1, i2 = (i0 + 2) % (segments*2), i3 = (i0 + 3) % (segments*2);
+            uint32_t i0 = i*2, i1 = i0 + 1, i2 = (i0 + 2) % (segments*2), i3 = (i0 + 3) % (segments*2);
             triangles.push_back({base + i0, base + i3, base + i1});
             triangles.push_back({base + i0, base + i2, base + i3});
         }
@@ -58,7 +58,7 @@ struct Mesh
     }
 };
 
-Mesh LoadMeshFromObj(const std::string & filepath);
+Mesh LoadMeshFromObj(const std::string & filepath, bool swapYZ);
 std::string LoadTextFile(const std::string & filename);
 
 #endif

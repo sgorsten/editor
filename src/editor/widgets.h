@@ -3,6 +3,7 @@
 
 #include "gui.h"
 #include "engine/font.h"
+#include "engine/asset.h"
 #include <sstream>
 #include <algorithm>
 
@@ -178,6 +179,13 @@ public:
         panel->children.push_back({{{2.0f/4,+spacing*2.0f/4},{0,0},{3.0f/4,-spacing*1.0f/4},{1,0}},MakeFloatEdit(value.z)});
         panel->children.push_back({{{3.0f/4,+spacing*3.0f/4},{0,0},{4.0f/4, 0},{1,0}},MakeFloatEdit(value.w)});
         return panel;
+    }
+    template<class T> gui::ElementPtr MakeAssetHandleEdit(AssetLibrary & assets, AssetLibrary::Handle<T> & value) const
+    {
+        return MakeEdit(value.IsValid() ? value.GetId() : "{None}", [&assets, &value](const std::string & text) 
+        {
+            value = assets.GetAsset<T>(text);
+        });
     }
 };
 

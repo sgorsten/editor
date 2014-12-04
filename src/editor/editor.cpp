@@ -327,7 +327,7 @@ Editor::Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../ass
 {
     assets.SetLoader<Mesh>([](const std::string & id) -> Mesh
     {
-        return LoadMeshFromObj("../assets/"+id+".obj");
+        return LoadMeshFromObj("../assets/"+id+".obj", true);
     });
 
     assets.SetLoader<gl::Program>([](const std::string & id) -> gl::Program
@@ -391,10 +391,11 @@ layout(binding = 2) uniform PerView
     selection.scaleMesh.Upload();
 
     auto cube = assets.GetAsset<Mesh>("cube");
+    auto teapot = assets.GetAsset<Mesh>("teapot");
     scene.CreateObject("Ground",{    0,0,-0.1f},{4,4,0.1f},cube,prog,{0.4f,0.4f,0.4f});
-    scene.CreateObject("Alpha", {-0.6f,0, 0.5f},{0.5f,0.5f,0.5f},cube,prog,{1,0,0});
-    scene.CreateObject("Beta",  {+0.6f,0, 0.5f},{0.5f,0.5f,0.5f},cube,prog,{0,1,0});
-    scene.CreateObject("Gamma", { 0.0f,0, 1.5f},{0.5f,0.5f,0.5f},cube,prog,{1,1,0});
+    scene.CreateObject("Red Box", {-0.6f,0, 0.5f},{0.5f,0.5f,0.5f},cube,prog,{1,0,0});
+    scene.CreateObject("Green Box",  {+0.6f,0, 0.5f},{0.5f,0.5f,0.5f},cube,prog,{0,1,0});
+    scene.CreateObject("Teapot", { 0.0f,0, 1.0f},{0.25f,0.25f,0.25f},teapot,prog,{1,1,0});
     auto lt = scene.CreateObject("Light", { 0.0f,-1.0f,3.0f},{0.1f,0.1f,0.1f},cube,prog,{0,0,0});
     lt->light = std::make_unique<LightComponent>();
     lt->light->color = {1,1,1};
@@ -516,6 +517,8 @@ void Editor::RefreshPropertyPanel()
         props.push_back({"Position", factory.MakeVectorEdit(obj->pose.position)});
         props.push_back({"Orientation", factory.MakeVectorEdit(obj->pose.orientation)});
         props.push_back({"Scale", factory.MakeVectorEdit(obj->localScale)});
+        props.push_back({"Mesh", factory.MakeAssetHandleEdit(assets, obj->mesh)});
+        props.push_back({"Program", factory.MakeAssetHandleEdit(assets, obj->prog)});
         props.push_back({"Diffuse Color", factory.MakeVectorEdit(obj->color)});
         auto pmap = factory.MakePropertyMap(props);
         float y0 = pmap->GetMinimumSize().y;

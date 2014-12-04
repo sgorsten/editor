@@ -13,11 +13,16 @@ struct AssetLibrary::List
     
         if(loader)
         {
-            auto r = std::make_shared<Record>();
-            r->id = id;
-            r->asset = loader(id);
-            records.push_back(r);
-            return r;
+            try
+            {
+                auto a = loader(id);
+                auto r = std::make_shared<Record>();
+                r->id = id;
+                r->asset = move(a);
+                records.push_back(r);
+                return r;
+            }
+            catch(...) {} // TODO: Make some sort of record
         }
 
         return {};
