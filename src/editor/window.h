@@ -9,15 +9,26 @@
 #include <sstream>
 
 struct NVGcontext;
-struct MenuItem;
+namespace gui { struct MenuItem; }
+
+struct Context
+{
+    GLFWwindow * mainWindow;
+    GLFWcursor * cursors[4];
+    NVGcontext * vg;
+
+    Context();
+    Context(GLFWwindow * mainWindow);
+    ~Context();
+};
 
 class Window
 {
     struct Shortcut { int mods, key; std::function<void()> onInvoke; };
 
     // Core window state
+    std::shared_ptr<Context> context;
     GLFWwindow * window;
-    GLFWcursor * cursors[4];
     gui::ElementPtr root;
     std::vector<Shortcut> shortcuts;
 
@@ -30,22 +41,20 @@ class Window
     gui::DraggerPtr dragger;
     int lastX, lastY;
 
-    // Rendering helpers
-    NVGcontext * vg;
-
     void CancelDrag();
     void TabTo(gui::ElementPtr element);
-    void GatherShortcuts(const MenuItem & item);
+    void GatherShortcuts(const gui::MenuItem & item);
 public:
-    Window(const char * title, int width, int height);
+    Window(const char * title, int width, int height, const Window * parent = nullptr);
     ~Window();
 
-    NVGcontext * GetNanoVG() const { return vg; }
+    bool IsMainWindow() const { return window == context->mainWindow; }
+    NVGcontext * GetNanoVG() const { return context->vg; }
 
     bool ShouldClose() const { return !!glfwWindowShouldClose(window); }
 
     void RefreshLayout();
-    void SetGuiRoot(gui::ElementPtr element, const Font & menuFont, const std::vector<MenuItem> & menuItems);
+    void SetGuiRoot(gui::ElementPtr element, const Font & menuFont, const std::vector<gui::MenuItem> & menuItems);
     void Redraw();
 };
 

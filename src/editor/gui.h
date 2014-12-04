@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <algorithm>
 #include <functional>
 
 class Font;
@@ -106,6 +107,118 @@ namespace gui
         virtual bool                                        OnKey(GLFWwindow * window, int key, int action, int mods) { return false; }
         virtual DraggerPtr                                  OnClick(const MouseEvent & e) { return nullptr; } // If a dragger is returned, it will take focus until user releases mouse or hits "escape"
         virtual void                                        OnTab() {}
+    };
+
+    // Element which fills its client area with a solid color
+    struct Fill : public gui::Element
+    {
+        NVGcolor color;
+        Fill(NVGcolor color) : color(color) {}
+        NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
+    };
+
+    // Element providing selectable, editable text
+    class Text : public gui::Element
+    {
+        const Font & font;
+        size_t cursor, mark;
+        bool isSelecting;
+
+        const char * GetFocusText() const { return text.data(); }
+        size_t GetFocusTextSize() const { return text.size(); }   
+    public:
+        std::string text;
+        bool isEditable;
+        NVGcolor color;
+
+        Text(const Font & font) : font(font), cursor(), mark(), isSelecting(), isEditable(), color(nvgRGBA(255,255,255,255)) {}
+
+        size_t GetSelectionLeftIndex() const { return std::min(cursor, mark); }
+        size_t GetSelectionRightIndex() const { return std::max(cursor, mark); }
+        std::string GetSelectionText() const { return std::string(text.c_str() + GetSelectionLeftIndex(), text.c_str() + GetSelectionRightIndex()); }
+
+        void SelectAll();
+        void MoveSelectionCursor(int newCursor, bool holdingShift);
+        void RemoveSelection();
+        void Insert(const char * string);
+
+        bool IsTabStop() const override { return isEditable; }
+        gui::Cursor GetCursor() const override { return isEditable ? gui::Cursor::IBeam : gui::Cursor::Arrow; }
+
+        void OnChar(uint32_t codepoint) override;
+        bool OnKey(GLFWwindow * window, int key, int action, int mods) override;
+        gui::DraggerPtr OnClick(const gui::MouseEvent & e) override;
+        void OnTab() override { SelectAll(); }
+        NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
+
+        std::function<void(const std::string &)> onEdit;
+    };
+
+    // User-draggable boundary between two child regions
+    class Splitter : public gui::Element
+    {
+    public:
+        enum Side { Left, Top, Right, Bottom };
+
+        Splitter(gui::ElementPtr panelA, gui::ElementPtr panelB, Side sideB, int pixelsB);
+    };
+
+    // Decoration around a client area
+    class Border : public gui::Element
+    {
+        int size; // Size of border region in pixels
+        float offset, width, radius; // Placement of stroked border
+        NVGcolor border, background; // Color of border, and internal fill
+    public:
+        Border(int size, float offset, float width, float radius, NVGcolor border, NVGcolor background, gui::ElementPtr inner);
+
+        NVGcolor OnDrawBackground(const gui::DrawEvent & e) const override;
+        void OnDrawForeground(const gui::DrawEvent & e) const override;
+
+        static std::shared_ptr<Border> CreateBigBorder(gui::ElementPtr inner);
+        static std::shared_ptr<Border> CreateEditBorder(gui::ElementPtr inner);
+    };
+
+    // List box, allowing for user selection
+    class ListBox : public gui::Element
+    {
+        const Font & font;
+        int spacing, selectedIndex;
+    public:
+        ListBox(const Font & font, int spacing) : font(font), spacing(spacing), selectedIndex(-1) {}
+
+        int GetSelectedIndex() const { return selectedIndex; }  
+
+        void SetSelectedIndex(int index);
+        void SetItemText(int index, const std::string & text);
+        void AddItem(const std::string & text);
+
+        std::function<void()> onSelectionChanged;
+    };
+
+    struct MenuItem
+    {
+        // TODO: Icon, hotkeys, etc
+        bool isEnabled;                 // If true, this menu item can be clicked on
+        std::string label;              // The string that should be displayed for this item
+        std::vector<MenuItem> children; // If nonempty, clicking on this item will open a popup menu
+        std::function<void()> onClick;  // If bound, clicking on this item will invoke this function
+        int hotKeyMods, hotKey;
+
+        MenuItem() : isEnabled(true), hotKeyMods(), hotKey() {}
+        MenuItem(const std::string & label, std::function<void()> onClick, int hotKeyMods=0, int hotKey=0) : isEnabled(true), label(label), onClick(onClick), hotKeyMods(hotKeyMods), hotKey(hotKey) {}
+
+        static MenuItem Popup(std::string label, std::vector<MenuItem> children) { auto r = MenuItem(); r.label = move(label); r.children = move(children); return r; }
+    };
+
+    // Supports a menu bar with drop-down menus
+    class Menu : public gui::Element
+    {
+        class Barrier;
+        std::shared_ptr<Barrier> barrier;
+        std::weak_ptr<gui::Element> MakePopup(size_t level, const Font & font, const std::vector<MenuItem> & items, float x, float y);
+    public:
+        Menu(gui::ElementPtr inner, const Font & font, const std::vector<MenuItem> & items);
     };
 }
 

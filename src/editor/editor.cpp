@@ -394,10 +394,10 @@ layout(binding = 2) uniform PerView
 
     objectListPanel = std::make_shared<gui::Element>();
     propertyPanel = std::make_shared<gui::Element>();
-    auto topRightPanel = Border::CreateBigBorder(objectListPanel);
-    auto bottomRightPanel = Border::CreateBigBorder(propertyPanel);
-    auto rightPanel = std::make_shared<Splitter>(bottomRightPanel, topRightPanel, Splitter::Top, 200);
-    mainPanel = std::make_shared<Splitter>(view, rightPanel, Splitter::Right, 400);
+    auto topRightPanel = gui::Border::CreateBigBorder(objectListPanel);
+    auto bottomRightPanel = gui::Border::CreateBigBorder(propertyPanel);
+    auto rightPanel = std::make_shared<gui::Splitter>(bottomRightPanel, topRightPanel, gui::Splitter::Top, 200);
+    mainPanel = std::make_shared<gui::Splitter>(view, rightPanel, gui::Splitter::Right, 400);
             
     selection.onSelectionChanged = [this]()
     {
@@ -407,8 +407,18 @@ layout(binding = 2) uniform PerView
     };
 
     LoadScene("../assets/test.scene");
-
     RefreshMenu();
+
+    auto dialogPanel = std::make_shared<gui::Fill>(nvgRGBA(32,32,32,255));
+    dialogPanel->AddChild({{0,0},{0,0},{1,0},{1,0}}, factory.MakeLabel("Hello there!"));
+    OpenDialog("Dialog Window", dialogPanel);
+}
+
+void Editor::OpenDialog(const char * title, gui::ElementPtr gui)
+{
+    auto d = std::make_shared<Window>(title, 400, 300, &window);
+    d->SetGuiRoot(gui, font, std::vector<gui::MenuItem>());
+    dialog = d;
 }
 
 int Editor::Run()
@@ -418,12 +428,15 @@ int Editor::Run()
     {
         glfwPollEvents();
 
+        if(dialog && dialog->ShouldClose()) dialog.reset();
+
         const auto t1 = glfwGetTime();
         const auto timestep = static_cast<float>(t1 - t0);
         t0 = t1;
 
         view->OnUpdate(timestep);
         window.Redraw();
+        if(dialog) dialog->Redraw();
     }
     return 0;
 }
@@ -436,10 +449,10 @@ void Editor::LoadScene(const std::string & filepath)
 
 void Editor::RefreshMenu()
 {
-    window.SetGuiRoot(mainPanel, font, std::vector<MenuItem>{
-        MenuItem::Popup("File", {
+    window.SetGuiRoot(mainPanel, font, std::vector<gui::MenuItem>{
+        gui::MenuItem::Popup("File", {
             {"New", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_N},
-            MenuItem::Popup("Open", {
+            gui::MenuItem::Popup("Open", {
                 {"Game", [](){}},
                 {"Level", [this](){ 
                     auto f = ChooseFile({{"Scene files","scene"}}, true);
@@ -453,12 +466,12 @@ void Editor::RefreshMenu()
             }, GLFW_MOD_CONTROL, GLFW_KEY_S},
             {"Exit", [this]() { quit = true; }, GLFW_MOD_ALT, GLFW_KEY_F4}
         }),
-        MenuItem::Popup("Edit", {
+        gui::MenuItem::Popup("Edit", {
             {"Cut",   [](){}, GLFW_MOD_CONTROL, GLFW_KEY_X},
             {"Copy",  [](){}, GLFW_MOD_CONTROL, GLFW_KEY_C},
             {"Paste", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_V}
         }),
-        MenuItem::Popup("Object", {
+        gui::MenuItem::Popup("Object", {
             {"New", [this]() { 
                 scene.CreateObject("New Object", {0,0,0}, {0.5f,0.5f,0.5f}, assets.GetAsset<Mesh>("cube"), assets.GetAsset<gl::Program>("diffuse"), {1,1,1});
                 RefreshObjectList();
@@ -472,7 +485,7 @@ void Editor::RefreshMenu()
                 scene.DeleteObject(selection.object.lock());
                 RefreshObjectList();
             }, 0, GLFW_KEY_DELETE},
-            MenuItem::Popup("Components", {
+            gui::MenuItem::Popup("Components", {
                 {"Add Light", [this]() { 
                     if(auto obj = selection.object.lock())
                     {
@@ -487,7 +500,7 @@ void Editor::RefreshMenu()
 void Editor::RefreshObjectList()
 {
     // TODO: Back up and restore selection
-    objectList = std::make_shared<ListBox>(font, 2);
+    objectList = std::make_shared<gui::ListBox>(font, 2);
     for(auto & obj : scene.objects) objectList->AddItem(obj->name);
     auto it = std::find(begin(scene.objects), end(scene.objects), selection.object.lock());
     objectList->SetSelectedIndex(it != end(scene.objects) ? it - begin(scene.objects) : -1);
@@ -523,7 +536,7 @@ void Editor::RefreshPropertyPanel()
         {
             props.clear();
             props.push_back({"Emissive Color", factory.MakeVectorEdit(obj->light->color)});
-            pmap = Border::CreateBigBorder(factory.MakePropertyMap(props));
+            pmap = gui::Border::CreateBigBorder(factory.MakePropertyMap(props));
 
             y0 += 8;
             auto y1 = y0+font.GetLineHeight();

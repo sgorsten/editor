@@ -177,7 +177,6 @@
     <ClCompile Include="..\..\src\editor\gui.cpp" />
     <ClCompile Include="..\..\src\editor\main.cpp" />
     <ClCompile Include="..\..\src\editor\scene.cpp" />
-    <ClCompile Include="..\..\src\editor\widgets.cpp" />
     <ClCompile Include="..\..\src\editor\window.cpp" />
     <ClCompile Include="..\..\src\editor\xplat.cpp" />
   </ItemGroup>

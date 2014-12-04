@@ -19,6 +19,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\dep\include\fontstash.h" />
+    <ClInclude Include="..\..\dep\include\nanovg.h" />
+    <ClInclude Include="..\..\dep\include\nanovg_gl.h" />
+    <ClInclude Include="..\..\dep\include\nanovg_gl_utils.h" />
+    <ClInclude Include="..\..\dep\include\stb_image.h" />
+    <ClInclude Include="..\..\dep\include\stb_truetype.h" />
     <ClInclude Include="..\..\src\engine\asset.h" />
     <ClInclude Include="..\..\src\engine\font.h" />
     <ClInclude Include="..\..\src\engine\geometry.h" />

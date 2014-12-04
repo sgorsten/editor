@@ -6,9 +6,6 @@
     <ClCompile Include="..\..\src\editor\gui.cpp">
       <Filter>gui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\editor\widgets.cpp">
-      <Filter>gui</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\editor\scene.cpp" />
     <ClCompile Include="..\..\src\editor\xplat.cpp" />
     <ClCompile Include="..\..\src\editor\editor.cpp">
