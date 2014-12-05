@@ -627,17 +627,13 @@ namespace gui
                 int2 oldMouse;
             public:
                 WindowDragger(TornPanel & panel, int2 oldMouse) : panel(panel), oldMouse(oldMouse) {}
-                void OnDrag(int2 newMouse) override { panel.window.SetPos(panel.window.GetPos() + newMouse - oldMouse); }
-                void OnRelease() override 
+                void OnDrag(int2 newMouse) override
                 {
-                    if(auto dockerPanel = panel.container.FindPanelAtScreenCoords(panel.window.GetPos() + oldMouse))
-                    {
-                        panel.container.Dock(*dockerPanel, panel.title, panel.children[0].element, Splitter::Right, 200);
-                        panel.children.clear();
-                        panel.window.Close();
-                    }
+                    panel.window.SetPos(panel.window.GetPos() + newMouse - oldMouse);
+                    panel.container.PreviewDockAtScreenCoords(panel.window.GetPos() + oldMouse);
                 }
-                void OnCancel() override {}
+                void OnRelease() override { panel.container.DockAtScreenCoords(panel.title, panel.children[0].element, panel.window.GetPos() + oldMouse); }
+                void OnCancel() override { panel.container.CancelPreview(); }
             };
 
             return std::make_shared<WindowDragger>(*this, e.cursor);
@@ -690,17 +686,14 @@ namespace gui
                 int2 oldMouse;
             public:
                 WindowDragger(TornPanel & torn, int2 oldMouse) : torn(torn), oldMouse(oldMouse) {}
-                void OnDrag(int2 newMouse) override { torn.window.SetPos(torn.window.GetPos() + newMouse - oldMouse); oldMouse = newMouse; }
-                void OnRelease() override 
+                void OnDrag(int2 newMouse) override
                 {
-                    if(auto dockerPanel = torn.container.FindPanelAtWindowCoords(oldMouse))
-                    {
-                        torn.container.Dock(*dockerPanel, torn.title, torn.children[0].element, Splitter::Right, 200);
-                        torn.children.clear();
-                        torn.window.Close();
-                    }
+                    torn.window.SetPos(torn.window.GetPos() + newMouse - oldMouse);
+                    oldMouse = newMouse;
+                    torn.container.PreviewDockAtWindowCoords(oldMouse);
                 }
-                void OnCancel() override {}
+                void OnRelease() override { torn.container.DockAtWindowCoords(torn.title, torn.children[0].element, oldMouse); }
+                void OnCancel() override { torn.container.CancelPreview(); }
             };
 
             return std::make_shared<WindowDragger>(*torn, e.cursor);
@@ -709,13 +702,12 @@ namespace gui
 
     void DockingContainer::RedrawAll()
     { 
-        for(auto it = begin(tornWindows); it != end(tornWindows); )
+        for(auto & panel : panels)
         {
-            if((*it)->ShouldClose()) it = tornWindows.erase(it);
-            else
+            if(panel.window)
             {
-                (*it)->Redraw();
-                ++it;
+                if(panel.window->ShouldClose()) panel.window.reset();
+                else panel.window->Redraw();
             }
         }
     }
@@ -723,9 +715,42 @@ namespace gui
     void DockingContainer::SetPrimaryElement(ElementPtr element)
     {
         children.clear();
-        dockedPanels.clear();
+        panels.clear();
         AddChild({{0,0},{0,0},{1,0},{1,0}}, element);
-        dockedPanels.push_back(element.get());
+        AddChild({{0,0},{0,0},{0,0},{0,0}}, std::make_shared<Fill>(nvgRGBA(64,64,64,128)));
+        panels.push_back({element, element, nullptr});
+        SetRect(rect);
+    }
+
+    void DockingContainer::PreviewDockAtScreenCoords(const int2 & point) { PreviewDockAtWindowCoords(point - mainWindow.GetPos()); }
+
+    void DockingContainer::PreviewDockAtWindowCoords(const int2 & point)
+    {
+        for(auto & panel : panels)
+        {
+            if(panel.window) continue;
+            if(panel.panel->rect.x0 <= point.x && panel.panel->rect.y0 <= point.y && point.x < panel.panel->rect.x1 && point.y < panel.panel->rect.y1)
+            {
+                auto prect = panel.panel->rect;
+                float dl = point.x - prect.x0;
+                float dt = point.y - prect.y0;
+                float dr = prect.x1 - point.x;
+                float db = prect.y1 - point.y;
+
+                if(dl <= dt && dl <= dr && dl <= db) children[1].placement = {{0,prect.x0-rect.x0},{0,prect.y0-rect.y0},{0,prect.x0-rect.x0+200},{0,prect.y1-prect.y0}};
+                else if(dt <= dr && dt <= db) children[1].placement = {{0,prect.x0-rect.x0},{0,prect.y0-rect.y0},{0,prect.x1-rect.x0},{0,prect.y0-prect.y0+200}};
+                else if(dr < db) children[1].placement = {{0,prect.x1-rect.x0-200},{0,prect.y0-rect.y0},{0,prect.x1-rect.x0},{0,prect.y1-prect.y0}};
+                else children[1].placement = {{0,prect.x0-rect.x0},{0,prect.y1-rect.y0-200},{0,prect.x1-rect.x0},{0,prect.y1-prect.y0}};
+                SetRect(rect);
+                return;
+            }
+        }
+        CancelPreview();
+    }
+
+    void DockingContainer::CancelPreview()
+    {
+        children[1].placement = {{0,0},{0,0},{0,0},{0,0}};
         SetRect(rect);
     }
 
@@ -734,8 +759,19 @@ namespace gui
         if(candidate.get() == &parent || candidate->children.size() == 1 && candidate->children[0].element.get() == &parent)
         {
             auto panel = std::make_shared<TearablePanel>(*this, font, panelTitle, element);
-            dockedPanels.push_back(panel.get());
             candidate = std::make_shared<Splitter>(candidate, panel, side, pixels);
+
+            for(auto & p : panels)
+            {
+                if(p.content == element)
+                {
+                    p.panel = panel;
+                    p.window->Close();
+                    return true;
+                }
+            }
+
+            panels.push_back({panel, element, nullptr});
             return true;
         }
 
@@ -755,18 +791,28 @@ namespace gui
         }
     }
 
-    Element * DockingContainer::FindPanelAtScreenCoords(const int2 & point) { return FindPanelAtWindowCoords(point - mainWindow.GetPos()); }
+    void DockingContainer::DockAtScreenCoords(const std::string & title, ElementPtr element, const int2 & coords) { DockAtWindowCoords(title, element, coords - mainWindow.GetPos()); }
 
-    Element * DockingContainer::FindPanelAtWindowCoords(const int2 & p)
+    void DockingContainer::DockAtWindowCoords(const std::string & title, ElementPtr element, const int2 & coords)
     {
-        for(auto panel : dockedPanels)
+        for(auto & panel : panels)
         {
-            if(panel->rect.x0 <= p.x && panel->rect.y0 <= p.y && p.x < panel->rect.x1 && p.y < panel->rect.y1)
+            if(panel.panel->rect.x0 <= coords.x && panel.panel->rect.y0 <= coords.y && coords.x < panel.panel->rect.x1 && coords.y < panel.panel->rect.y1)
             {
-                return panel; 
+                auto prect = panel.panel->rect;
+                float dl = coords.x - prect.x0;
+                float dt = coords.y - prect.y0;
+                float dr = prect.x1 - coords.x;
+                float db = prect.y1 - coords.y;
+
+                if(dl <= dt && dl <= dr && dl <= db) Dock(*panel.panel, title, element, Splitter::Left, 200);
+                else if(dt <= dr && dt <= db) Dock(*panel.panel, title, element, Splitter::Top, 200);
+                else if(dr < db) Dock(*panel.panel, title, element, Splitter::Right, 200);
+                else Dock(*panel.panel, title, element, Splitter::Bottom, 200);
+                break;
             }
-        }
-        return nullptr;
+        }      
+        CancelPreview();
     }
 
     static ElementPtr TearElement(ElementPtr & candidate, Element & element)
@@ -795,7 +841,6 @@ namespace gui
     std::shared_ptr<Window> DockingContainer::Tear(Element & element)
     {
         auto tear = TearElement(children[0].element, element);
-        dockedPanels.erase(std::find(begin(dockedPanels), end(dockedPanels), tear.get()));
         SetRect(rect);
 
         auto pos = mainWindow.GetPos();
@@ -805,7 +850,14 @@ namespace gui
         glfwWindowHint(GLFW_DECORATED, 0);
         auto win = std::make_shared<Window>("", element.rect.GetWidth()+2, element.rect.GetHeight()+2, &mainWindow, pos);
         glfwDefaultWindowHints();
-        tornWindows.push_back(win);
+
+        for(auto & panel : panels)
+        {
+            if(panel.panel.get() == &element)
+            {
+                panel.window = win;
+            }
+        }
         return win;
     }
 }

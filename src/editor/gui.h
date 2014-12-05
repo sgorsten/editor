@@ -226,21 +226,34 @@ namespace gui
     // Allow for named panels to be "docked", and rearranged by the user
     class DockingContainer : public gui::Element
     {
+        struct PanelState
+        {
+            ElementPtr panel, content;
+            std::shared_ptr<Window> window; // If empty, panel is currently docked
+        };
+
         Window & mainWindow;
         const Font & font;
-        std::vector<std::shared_ptr<Window>> tornWindows;
-        std::vector<Element *> dockedPanels;
+        std::vector<PanelState> panels;
+
+        /*std::vector<std::shared_ptr<Window>> tornWindows;
+        std::vector<Element *> dockedPanels;*/
 
         bool DockElement(ElementPtr & candidate, Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels);
     public:
         DockingContainer(Window & mainWindow, const Font & font) : mainWindow(mainWindow), font(font) {}
 
+        void PreviewDockAtScreenCoords(const int2 & point);
+        void PreviewDockAtWindowCoords(const int2 & point);
+        void CancelPreview();
+
         void RedrawAll();
 
         void SetPrimaryElement(ElementPtr element);
         void Dock(Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels);
-        Element * FindPanelAtScreenCoords(const int2 & point);
-        Element * FindPanelAtWindowCoords(const int2 & point);
+
+        void DockAtScreenCoords(const std::string & title, ElementPtr element, const int2 & coords);
+        void DockAtWindowCoords(const std::string & title, ElementPtr element, const int2 & coords);
 
         std::shared_ptr<Window> Tear(Element & element);
     };
