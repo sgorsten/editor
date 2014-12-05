@@ -31,6 +31,24 @@
     <ClInclude Include="..\..\src\engine\load.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\dep\include\fontstash.h">
+      <Filter>dep</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dep\include\nanovg.h">
+      <Filter>dep</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dep\include\nanovg_gl.h">
+      <Filter>dep</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dep\include\nanovg_gl_utils.h">
+      <Filter>dep</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dep\include\stb_image.h">
+      <Filter>dep</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dep\include\stb_truetype.h">
+      <Filter>dep</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dep\src\nanovg.c">

@@ -43,18 +43,119 @@ void Window::TabTo(gui::ElementPtr element)
     if(focus) focus->OnTab();
 }
 
-Window::Window(const char * title, int width, int height) : window(), width(width), height(height), focus(), vg()
+Window::Window(const char * title, int width, int height, const Window * parent, int2 pos) : window(), width(width), height(height), focus()
 {
-    glfwWindowHint(GLFW_STENCIL_BITS, 8);
-    window = glfwCreateWindow(width, height, title, nullptr, nullptr);
+    window = glfwCreateWindow(width, height, title, nullptr, parent ? parent->context->mainWindow : nullptr);
     glfwSetWindowUserPointer(window, this);
-    glfwMakeContextCurrent(window);
 
-    glewExperimental = GL_TRUE;
-	if(glewInit() != GLEW_OK) throw std::runtime_error("Could not init glew");
+    int2 newPos;
+    glfwGetWindowPos(window, &newPos.x, &newPos.y);
+    if(pos.x >= 0) newPos.x = pos.x;
+    if(pos.y >= 0) newPos.y = pos.y;
+    glfwSetWindowPos(window, newPos.x, newPos.y);
 
-    vg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES | NVG_DEBUG);
-	if (vg == NULL) throw std::runtime_error("Could not init nanovg");
+    context = parent ? parent->context : std::make_shared<Context>(window);
+
+    glfwSetWindowSizeCallback(window, [](GLFWwindow * window, int width, int height)
+    {
+        reinterpret_cast<Window *>(glfwGetWindowUserPointer(window))->RefreshLayout();
+    });
+
+    glfwSetWindowRefreshCallback(window, [](GLFWwindow * window)
+    {
+        reinterpret_cast<Window *>(glfwGetWindowUserPointer(window))->Redraw();
+    });
+
+    glfwSetCharCallback(window, [](GLFWwindow * window, unsigned int codepoint)
+    {
+        auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+        if(w->focus) w->focus->OnChar(codepoint);
+    });
+
+    glfwSetMouseButtonCallback(window, [](GLFWwindow * window, int button, int action, int mods)
+    {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+
+        auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+        if(action == GLFW_PRESS)
+        {
+            w->CancelDrag();
+
+            w->focus = w->mouseover;
+            if(w->focus) w->dragger = w->focus->OnClick({{(int)xpos, (int)ypos}, button, mods});
+        }
+        if(action == GLFW_RELEASE)
+        {
+            if(w->dragger)
+            {
+                w->dragger->OnRelease();
+                w->dragger.reset();
+            }
+
+            w->mouseover = GetElement(w->root, (int)xpos, (int)ypos);
+            glfwSetCursor(window, w->context->cursors[(int)(w->mouseover ? w->mouseover->GetCursor() : gui::Cursor::Arrow)]);
+        }
+    });
+
+    glfwSetCursorPosCallback(window, [](GLFWwindow * window, double cx, double cy)
+    {
+        int x = static_cast<int>(cx), y = static_cast<int>(cy);
+        auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+        if(w->dragger) w->dragger->OnDrag(int2(cx,cy));
+        else
+        {
+            w->mouseover = GetElement(w->root, x, y);
+            glfwSetCursor(window, w->context->cursors[(int)(w->mouseover ? w->mouseover->GetCursor() : gui::Cursor::Arrow)]);
+        }
+        w->lastX = x;
+        w->lastY = y;
+    });
+
+    glfwSetKeyCallback(window, [](GLFWwindow * window, int key, int scancode, int action, int mods)
+    {
+        auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+
+        // Handle certain global UI keys
+        if(action != GLFW_RELEASE) switch(key)
+        {
+        case GLFW_KEY_ESCAPE: // Escape cancels the current dragger
+            w->CancelDrag();
+            return;
+        case GLFW_KEY_TAB: // Tab iterates through editable controls
+            if(w->focus)
+            {
+                auto focusIt = std::find(begin(w->tabStops), end(w->tabStops), w->focus);
+                if(focusIt == end(w->tabStops) || ++focusIt == end(w->tabStops)) w->TabTo(nullptr);
+                else w->TabTo(*focusIt);
+            }
+            if(!w->focus && !w->tabStops.empty()) w->TabTo(w->tabStops.front());
+            return;
+        }
+
+        if(w->dragger && w->dragger->OnKey(key, action, mods)) return; // If one is present, a dragger can consume keystrokes
+        if(w->focus && w->focus->OnKey(window, key, action, mods)) return; // If an element is focused, it can consume keystrokes
+
+        // Remaining keys can be consumed by global shortcuts
+        if(action == GLFW_PRESS)
+        {
+            for(auto & shortcut : w->shortcuts)
+            {
+                if(key == shortcut.key && mods == shortcut.mods)
+                {
+                    shortcut.onInvoke();
+                    return;
+                }
+            }
+        }
+    });
+}
+
+Context::Context() { memset(this, 0, sizeof(this)); }
+
+Context::Context(GLFWwindow * mainWindow) : Context()
+{
+    this->mainWindow = mainWindow;
 
     struct Color { uint8_t r,g,b,a; } W{255,255,255,255}, B{0,0,0,255}, _{0,0,0,0};
     Color arrow[] = {
@@ -138,105 +239,28 @@ Window::Window(const char * title, int width, int height) : window(), width(widt
     image = {23,9,&sizewe[0].r};
     cursors[(int)gui::Cursor::SizeWE] = glfwCreateCursor(&image, 11, 4);
 
-    glfwSetWindowSizeCallback(window, [](GLFWwindow * window, int width, int height)
-    {
-        reinterpret_cast<Window *>(glfwGetWindowUserPointer(window))->RefreshLayout();
-    });
+    glfwMakeContextCurrent(mainWindow);
+    glewExperimental = GL_TRUE;
+	if(glewInit() != GLEW_OK) throw std::runtime_error("Could not init glew");
 
-    glfwSetWindowRefreshCallback(window, [](GLFWwindow * window)
-    {
-        reinterpret_cast<Window *>(glfwGetWindowUserPointer(window))->Redraw();
-    });
+    vg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES);
+	if (vg == NULL) throw std::runtime_error("Could not init nanovg");
+}
 
-    glfwSetCharCallback(window, [](GLFWwindow * window, unsigned int codepoint)
-    {
-        auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
-        if(w->focus) w->focus->OnChar(codepoint);
-    });
-
-    glfwSetMouseButtonCallback(window, [](GLFWwindow * window, int button, int action, int mods)
-    {
-        double xpos, ypos;
-        glfwGetCursorPos(window, &xpos, &ypos);
-
-        auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
-        if(action == GLFW_PRESS)
-        {
-            w->CancelDrag();
-
-            w->focus = w->mouseover;
-            if(w->focus) w->dragger = w->focus->OnClick({{(int)xpos, (int)ypos}, button, mods});
-        }
-        if(action == GLFW_RELEASE)
-        {
-            if(w->dragger)
-            {
-                w->dragger->OnRelease();
-                w->dragger.reset();
-            }
-
-            w->mouseover = GetElement(w->root, (int)xpos, (int)ypos);
-            glfwSetCursor(window, w->cursors[(int)(w->mouseover ? w->mouseover->GetCursor() : gui::Cursor::Arrow)]);
-        }
-    });
-
-    glfwSetCursorPosCallback(window, [](GLFWwindow * window, double cx, double cy)
-    {
-        int x = static_cast<int>(cx), y = static_cast<int>(cy);
-        auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
-        if(w->dragger) w->dragger->OnDrag(int2(cx,cy));
-        else
-        {
-            w->mouseover = GetElement(w->root, x, y);
-            glfwSetCursor(window, w->cursors[(int)(w->mouseover ? w->mouseover->GetCursor() : gui::Cursor::Arrow)]);
-        }
-        w->lastX = x;
-        w->lastY = y;
-    });
-
-    glfwSetKeyCallback(window, [](GLFWwindow * window, int key, int scancode, int action, int mods)
-    {
-        auto w = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
-
-        // Handle certain global UI keys
-        if(action != GLFW_RELEASE) switch(key)
-        {
-        case GLFW_KEY_ESCAPE: // Escape cancels the current dragger
-            w->CancelDrag();
-            return;
-        case GLFW_KEY_TAB: // Tab iterates through editable controls
-            if(w->focus)
-            {
-                auto focusIt = std::find(begin(w->tabStops), end(w->tabStops), w->focus);
-                if(focusIt == end(w->tabStops) || ++focusIt == end(w->tabStops)) w->TabTo(nullptr);
-                else w->TabTo(*focusIt);
-            }
-            if(!w->focus && !w->tabStops.empty()) w->TabTo(w->tabStops.front());
-            return;
-        }
-
-        if(w->dragger && w->dragger->OnKey(key, action, mods)) return; // If one is present, a dragger can consume keystrokes
-        if(w->focus && w->focus->OnKey(window, key, action, mods)) return; // If an element is focused, it can consume keystrokes
-
-        // Remaining keys can be consumed by global shortcuts
-        if(action == GLFW_PRESS)
-        {
-            for(auto & shortcut : w->shortcuts)
-            {
-                if(key == shortcut.key && mods == shortcut.mods)
-                {
-                    shortcut.onInvoke();
-                    return;
-                }
-            }
-        }
-    });
+Context::~Context()
+{
+    if(vg) nvgDeleteGL3(vg);
+    for(auto cursor : cursors) if(cursor) glfwDestroyCursor(cursor);
+    if(mainWindow) glfwDestroyWindow(mainWindow);
 }
 
 Window::~Window()
 {
-    nvgDeleteGL3(vg);
-    glfwDestroyWindow(window);
+    // If we are not the main window, destroy our GLFW window.
+    if(window && window != context->mainWindow)
+    {
+        glfwDestroyWindow(window);
+    }
 }
 
 static void CollectTabStops(std::vector<gui::ElementPtr> & tabStops, const gui::ElementPtr & elem)
@@ -254,17 +278,17 @@ void Window::RefreshLayout()
     CollectTabStops(tabStops, root);
 }
 
-void Window::GatherShortcuts(const MenuItem & item)
+void Window::GatherShortcuts(const gui::MenuItem & item)
 {
     if(item.hotKey) shortcuts.push_back({item.hotKeyMods, item.hotKey, item.onClick});
     for(auto & child : item.children) GatherShortcuts(child);
 }
 
-void Window::SetGuiRoot(gui::ElementPtr element, const Font & menuFont, const std::vector<MenuItem> & menuItems)
+void Window::SetGuiRoot(gui::ElementPtr element, const Font & menuFont, const std::vector<gui::MenuItem> & menuItems)
 {
     shortcuts.clear();
     for(auto & item : menuItems) GatherShortcuts(item);
-    root = std::make_shared<Menu>(element, menuFont, menuItems);
+    root = menuItems.empty() ? element : std::make_shared<gui::Menu>(element, menuFont, menuItems);
     RefreshLayout();
 }
 
@@ -301,14 +325,24 @@ void Window::Redraw()
     glfwMakeContextCurrent(window);
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     glViewport(0, 0, width, height);
-    glClearColor(0,0,1,0);
+    glClearColor(0.125f,0.125f,0.125f,1);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 
-    nvgBeginFrame(vg, width, height, 1.0f);
-    DrawElement(vg, *root, mouseover.get(), focus.get(), nvgRGBA(0,0,0,0));
-    //DrawElementBounds(vg, *root, mouseover.get(), focus.get());
-    nvgEndFrame(vg);
+    nvgBeginFrame(context->vg, width, height, 1.0f);
+
+
+    DrawElement(context->vg, *root, mouseover.get(), focus.get(), nvgRGBA(0,0,0,0));
+    //DrawElementBounds(context->vg, *root, mouseover.get(), focus.get());
+    nvgEndFrame(context->vg);
 
     glPopAttrib();
+
+    glUseProgram(0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
     glfwSwapBuffers(window);
 }

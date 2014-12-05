@@ -43,20 +43,20 @@ struct View : public gui::Element
 
 class Editor
 {
-    Window                  window;      
-    AssetLibrary            assets;
-    Font                    font;
-    GuiFactory              factory;
-    std::shared_ptr<ListBox>objectList;
-    gui::ElementPtr         mainPanel;
-    gui::ElementPtr         objectListPanel;
-    gui::ElementPtr         propertyPanel;
+    Window                                  window;
+    AssetLibrary                            assets;
+    Font                                    font;
+    GuiFactory                              factory;
+    std::shared_ptr<gui::ListBox>           objectList;
+    std::shared_ptr<gui::DockingContainer>  docker;
+    gui::ElementPtr                         objectListPanel;
+    gui::ElementPtr                         propertyPanel;
 
-    Scene                   scene;
-    Selection               selection;
-    std::shared_ptr<View>   view;
+    Scene                                   scene;
+    Selection                               selection;
+    std::shared_ptr<View>                   view;
 
-    bool                    quit;
+    bool                                    quit;
 
     void LoadScene(const std::string & filepath);
     void RefreshMenu();
