@@ -686,16 +686,24 @@ namespace gui
 
             class WindowDragger : public IDragger
             {
-                Window & window;
+                TornPanel & torn;
                 int2 oldMouse;
             public:
-                WindowDragger(Window & window, int2 oldMouse) : window(window), oldMouse(oldMouse) {}
-                void OnDrag(int2 newMouse) override { window.SetPos(window.GetPos() + newMouse - oldMouse); oldMouse = newMouse; }
-                void OnRelease() override {}
+                WindowDragger(TornPanel & torn, int2 oldMouse) : torn(torn), oldMouse(oldMouse) {}
+                void OnDrag(int2 newMouse) override { torn.window.SetPos(torn.window.GetPos() + newMouse - oldMouse); oldMouse = newMouse; }
+                void OnRelease() override 
+                {
+                    if(auto dockerPanel = torn.container.FindPanelAtWindowCoords(oldMouse))
+                    {
+                        torn.container.Dock(*dockerPanel, torn.title, torn.children[0].element, Splitter::Right, 200);
+                        torn.children.clear();
+                        torn.window.Close();
+                    }
+                }
                 void OnCancel() override {}
             };
 
-            return std::make_shared<WindowDragger>(*win, e.cursor);
+            return std::make_shared<WindowDragger>(*torn, e.cursor);
         }
     };
 
@@ -747,9 +755,10 @@ namespace gui
         }
     }
 
-    Element * DockingContainer::FindPanelAtScreenCoords(const int2 & point)
+    Element * DockingContainer::FindPanelAtScreenCoords(const int2 & point) { return FindPanelAtWindowCoords(point - mainWindow.GetPos()); }
+
+    Element * DockingContainer::FindPanelAtWindowCoords(const int2 & p)
     {
-        auto p = point - mainWindow.GetPos();
         for(auto panel : dockedPanels)
         {
             if(panel->rect.x0 <= p.x && panel->rect.y0 <= p.y && p.x < panel->rect.x1 && p.y < panel->rect.y1)

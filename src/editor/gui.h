@@ -240,6 +240,7 @@ namespace gui
         void SetPrimaryElement(ElementPtr element);
         void Dock(Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels);
         Element * FindPanelAtScreenCoords(const int2 & point);
+        Element * FindPanelAtWindowCoords(const int2 & point);
 
         std::shared_ptr<Window> Tear(Element & element);
     };
