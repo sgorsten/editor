@@ -584,11 +584,12 @@ namespace gui
 
     struct TornPanel : public gui::Element
     {
+        DockingContainer & container;
         Window & window;
         const Font & font;
         std::string title;
 
-        TornPanel::TornPanel(Window & window, const Font & font, const std::string & title, gui::ElementPtr child) : window(window), font(font), title(title)
+        TornPanel::TornPanel(DockingContainer & container, Window & window, const Font & font, const std::string & title, gui::ElementPtr child) : container(container), window(window), font(font), title(title)
         {
             AddChild({{0,3},{0,font.GetLineHeight()+5},{1,-3},{1,-3}}, child);
         }
@@ -622,16 +623,24 @@ namespace gui
 
             class WindowDragger : public IDragger
             {
-                Window & window;
+                TornPanel & panel;
                 int2 oldMouse;
             public:
-                WindowDragger(Window & window, int2 oldMouse) : window(window), oldMouse(oldMouse) {}
-                void OnDrag(int2 newMouse) override { window.SetPos(window.GetPos() + newMouse - oldMouse); }
-                void OnRelease() override {}
+                WindowDragger(TornPanel & panel, int2 oldMouse) : panel(panel), oldMouse(oldMouse) {}
+                void OnDrag(int2 newMouse) override { panel.window.SetPos(panel.window.GetPos() + newMouse - oldMouse); }
+                void OnRelease() override 
+                {
+                    if(auto dockerPanel = panel.container.FindPanelAtScreenCoords(panel.window.GetPos() + oldMouse))
+                    {
+                        panel.container.Dock(*dockerPanel, panel.title, panel.children[0].element, Splitter::Right, 200);
+                        panel.children.clear();
+                        panel.window.Close();
+                    }
+                }
                 void OnCancel() override {}
             };
 
-            return std::make_shared<WindowDragger>(window, e.cursor);
+            return std::make_shared<WindowDragger>(*this, e.cursor);
         }
     };
 
@@ -669,10 +678,10 @@ namespace gui
         {
             if(e.cursor.y >= rect.y0 + font.GetLineHeight()+2 || children.empty()) return nullptr;
 
-            auto win = container.Tear(rect);
+            auto win = container.Tear(*this);
             auto child = children[0].element;
             children.clear();
-            auto torn = std::make_shared<TornPanel>(*win, font, title, child);
+            auto torn = std::make_shared<TornPanel>(container, *win, font, title, child);
             win->SetGuiRoot(torn, font, std::vector<MenuItem>());
 
             class WindowDragger : public IDragger
@@ -690,20 +699,41 @@ namespace gui
         }
     };
 
-    void DockingContainer::RedrawAll() const { for(auto & window : tornWindows) window->Redraw(); }
+    void DockingContainer::RedrawAll()
+    { 
+        for(auto it = begin(tornWindows); it != end(tornWindows); )
+        {
+            if((*it)->ShouldClose()) it = tornWindows.erase(it);
+            else
+            {
+                (*it)->Redraw();
+                ++it;
+            }
+        }
+    }
 
-    static bool DockElement(DockingContainer & manager, const Font & font, ElementPtr & candidate, Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels)
+    void DockingContainer::SetPrimaryElement(ElementPtr element)
+    {
+        children.clear();
+        dockedPanels.clear();
+        AddChild({{0,0},{0,0},{1,0},{1,0}}, element);
+        dockedPanels.push_back(element.get());
+        SetRect(rect);
+    }
+
+    bool DockingContainer::DockElement(ElementPtr & candidate, Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels)
     {
         if(candidate.get() == &parent || candidate->children.size() == 1 && candidate->children[0].element.get() == &parent)
         {
-            auto panel = std::make_shared<TearablePanel>(manager, font, panelTitle, element);
+            auto panel = std::make_shared<TearablePanel>(*this, font, panelTitle, element);
+            dockedPanels.push_back(panel.get());
             candidate = std::make_shared<Splitter>(candidate, panel, side, pixels);
             return true;
         }
 
         for(auto & child : candidate->children)
         {
-            if(DockElement(manager, font, child.element, parent, panelTitle, element, side, pixels)) return true;
+            if(DockElement(child.element, parent, panelTitle, element, side, pixels)) return true;
         }
 
         return false;
@@ -711,20 +741,60 @@ namespace gui
 
     void DockingContainer::Dock(Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels)
     {
-        if(DockElement(*this, font, children[0].element, parent, panelTitle, element, side, pixels))
+        if(DockElement(children[0].element, parent, panelTitle, element, side, pixels))
         {
             SetRect(rect);
         }
     }
 
-    std::shared_ptr<Window> DockingContainer::Tear(const Rect & rect)
+    Element * DockingContainer::FindPanelAtScreenCoords(const int2 & point)
     {
+        auto p = point - mainWindow.GetPos();
+        for(auto panel : dockedPanels)
+        {
+            if(panel->rect.x0 <= p.x && panel->rect.y0 <= p.y && p.x < panel->rect.x1 && p.y < panel->rect.y1)
+            {
+                return panel; 
+            }
+        }
+        return nullptr;
+    }
+
+    static ElementPtr TearElement(ElementPtr & candidate, Element & element)
+    {
+        if(candidate->children.size() != 3) return nullptr; // Can only tear from splitters
+        
+        if(candidate->children[1].element.get() == &element)
+        {
+            auto tear = candidate->children[1].element;
+            candidate = candidate->children[2].element;
+            return tear;
+        }
+
+        if(candidate->children[2].element.get() == &element)
+        {
+            auto tear = candidate->children[2].element;
+            candidate = candidate->children[1].element;
+            return tear;
+        }
+
+        if(auto tear = TearElement(candidate->children[1].element, element)) return tear;
+        if(auto tear = TearElement(candidate->children[2].element, element)) return tear;
+        return nullptr;
+    }
+
+    std::shared_ptr<Window> DockingContainer::Tear(Element & element)
+    {
+        auto tear = TearElement(children[0].element, element);
+        dockedPanels.erase(std::find(begin(dockedPanels), end(dockedPanels), tear.get()));
+        SetRect(rect);
+
         auto pos = mainWindow.GetPos();
-        pos.x += rect.x0 - 1;
-        pos.y += rect.y0 - 1;
+        pos.x += element.rect.x0 - 1;
+        pos.y += element.rect.y0 - 1;
 
         glfwWindowHint(GLFW_DECORATED, 0);
-        auto win = std::make_shared<Window>("", rect.GetWidth()+2, rect.GetHeight()+2, &mainWindow, pos);
+        auto win = std::make_shared<Window>("", element.rect.GetWidth()+2, element.rect.GetHeight()+2, &mainWindow, pos);
         glfwDefaultWindowHints();
         tornWindows.push_back(win);
         return win;

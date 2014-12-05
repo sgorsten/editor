@@ -54,6 +54,7 @@ public:
     bool IsMainWindow() const { return window == context->mainWindow; }
     NVGcontext * GetNanoVG() const { return context->vg; }
 
+    void Close() { glfwSetWindowShouldClose(window, 1); }
     bool ShouldClose() const { return !!glfwWindowShouldClose(window); }
 
     void RefreshLayout();

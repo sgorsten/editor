@@ -229,15 +229,19 @@ namespace gui
         Window & mainWindow;
         const Font & font;
         std::vector<std::shared_ptr<Window>> tornWindows;
+        std::vector<Element *> dockedPanels;
+
+        bool DockElement(ElementPtr & candidate, Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels);
     public:
         DockingContainer(Window & mainWindow, const Font & font) : mainWindow(mainWindow), font(font) {}
 
-        void RedrawAll() const;
+        void RedrawAll();
 
-        void SetPrimaryElement(ElementPtr element) { children.clear(); AddChild({{0,0},{0,0},{1,0},{1,0}}, element); SetRect(rect); }
+        void SetPrimaryElement(ElementPtr element);
         void Dock(Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels);
+        Element * FindPanelAtScreenCoords(const int2 & point);
 
-        std::shared_ptr<Window> Tear(const Rect & rect);
+        std::shared_ptr<Window> Tear(Element & element);
     };
 }
 
