@@ -332,7 +332,7 @@ Editor::Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../ass
 
     assets.SetLoader<gl::Program>([](const std::string & id) -> gl::Program
     {
-        std::string shaderPrelude = R"(#version 330
+        std::string shaderPrelude = R"(#version 420
 struct PointLight
 {
     vec3 position;
@@ -359,15 +359,6 @@ layout(binding = 2) uniform PerView
 
     auto prog = assets.GetAsset<gl::Program>("simple");
     selection.selectionProgram = assets.GetAsset<gl::Program>("white");
-
-    for(auto & block : prog->GetBlocks())
-    {
-        std::cout << "Block " << block.binding << ": " << block.name << " (" << block.dataSize << " B)" << std::endl;
-        for(auto & uniform : block.uniforms)
-        {
-            std::cout << "  " << uniform.offset << ": " << uniform.name << " : " << uniform.type << "[" << uniform.size << "] " << uniform.arrayStride << "/" << uniform.matrixStride << std::endl;
-        }
-    }
 
     selection.arrowMesh.AddCylinder({0,0,0}, 0.00f, {0,0,0}, 0.05f, {1,0,0}, {0,1,0}, 12);
     selection.arrowMesh.AddCylinder({0,0,0}, 0.05f, {0,0,1}, 0.05f, {1,0,0}, {0,1,0}, 12);

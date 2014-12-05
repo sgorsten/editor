@@ -6,15 +6,17 @@
 
 Mesh LoadMeshFromObj(const std::string & filepath, bool swapYZ)
 {
+
+    std::ifstream in(filepath);
+    if(!in) throw std::runtime_error("File not found: " + filepath);
+
     std::vector<Vertex> vertices;
     std::map<std::string, size_t> indices;
     std::vector<uint3> triangles;
 
     std::vector<float4> positions;
     std::vector<float3> texCoords, normals;
-
     std::string line;
-    std::ifstream in(filepath);
     while(in)
     {
         std::getline(in, line);
@@ -76,6 +78,7 @@ Mesh LoadMeshFromObj(const std::string & filepath, bool swapYZ)
             }
         }
     }
+    in.close();
 
     if(swapYZ)
     {
