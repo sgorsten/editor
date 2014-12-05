@@ -223,13 +223,25 @@ namespace gui
         Menu(gui::ElementPtr inner, const Font & font, const std::vector<MenuItem> & items);
     };
 
+    class DockingManager
+    {
+        Window & mainWindow;
+        std::vector<std::shared_ptr<Window>> tornWindows;
+    public:
+        DockingManager(Window & mainWindow) : mainWindow(mainWindow) {}
+
+        void RedrawAll() const;
+
+        std::shared_ptr<Window> Tear(const Rect & rect);
+    };
+
     struct TearablePanel : public gui::Element
     {
-        const Window & mainWindow;
+        DockingManager & manager;
         const Font & font;
         std::string title;
 
-        TearablePanel(const Window & mainWindow, const Font & font, const std::string & title);
+        TearablePanel(DockingManager & manager, const Font & font, const std::string & title);
 
         gui::Element & GetClientArea() { return *children[0].element; }
 

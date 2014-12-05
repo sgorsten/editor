@@ -582,7 +582,22 @@ namespace gui
     // TearablePanel //
     ///////////////////
 
-    TearablePanel::TearablePanel(const Window & mainWindow, const Font & font, const std::string & title) : mainWindow(mainWindow), font(font), title(title) 
+    void DockingManager::RedrawAll() const { for(auto & window : tornWindows) window->Redraw(); }
+
+    std::shared_ptr<Window> DockingManager::Tear(const Rect & rect)
+    {
+        auto pos = mainWindow.GetPos();
+        pos.x += rect.x0 - 1;
+        pos.y += rect.y0 - 1;
+
+        glfwWindowHint(GLFW_DECORATED, 0);
+        auto win = std::make_shared<Window>("", rect.GetWidth()+2, rect.GetHeight()+2, &mainWindow, pos);
+        glfwDefaultWindowHints();
+        tornWindows.push_back(win);
+        return win;
+    }
+
+    TearablePanel::TearablePanel(DockingManager & manager, const Font & font, const std::string & title) : manager(manager), font(font), title(title) 
     {
         AddChild({{0,0},{0,font.GetLineHeight()+2},{1,0},{1,0}}, std::make_shared<gui::Element>());
     }
@@ -610,15 +625,9 @@ namespace gui
     {
         if(e.cursor.y >= rect.y0 + font.GetLineHeight()+2 || children.empty()) return nullptr;
 
-        auto pos = mainWindow.GetPos();
-        pos.x += rect.x0 - 1;
-        pos.y += rect.y0 - 1;
-
-        glfwWindowHint(GLFW_DECORATED, 0);
-        auto win = new Window(title.c_str(), rect.GetWidth(), rect.GetHeight(), &mainWindow, pos);
+        auto win = manager.Tear(rect);
         auto child = children[0].element;
         children.clear();
-
         auto torn = std::make_shared<TornPanel>(*win, font, title, child);
         win->SetGuiRoot(torn, font, std::vector<MenuItem>());
 

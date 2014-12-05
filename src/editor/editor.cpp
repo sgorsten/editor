@@ -323,7 +323,7 @@ static Mesh MakeBox(const float3 & halfDims)
 #include <sstream>
 #include <iostream>
 
-Editor::Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), quit()
+Editor::Editor() : window("Editor", 1280, 720), docker(window), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), quit()
 {
     assets.SetLoader<Mesh>([](const std::string & id) -> Mesh
     {
@@ -385,8 +385,8 @@ layout(binding = 2) uniform PerView
 
     objectListPanel = std::make_shared<gui::Element>();
     propertyPanel = std::make_shared<gui::Element>();
-    auto topRightPanel = factory.MakeTearablePanel(window, "Object List", objectListPanel);
-    auto bottomRightPanel = factory.MakeTearablePanel(window, "Property Viewer", propertyPanel);
+    auto topRightPanel = factory.MakeTearablePanel(docker, "Object List", objectListPanel);
+    auto bottomRightPanel = factory.MakeTearablePanel(docker, "Property Viewer", propertyPanel);
     auto rightPanel = std::make_shared<gui::Splitter>(bottomRightPanel, topRightPanel, gui::Splitter::Top, 200);
     mainPanel = std::make_shared<gui::Splitter>(view, rightPanel, gui::Splitter::Right, 400);
             
@@ -399,17 +399,6 @@ layout(binding = 2) uniform PerView
 
     LoadScene("../assets/test.scene");
     RefreshMenu();
-
-    auto dialogPanel = std::make_shared<gui::Fill>(nvgRGBA(32,32,32,255));
-    dialogPanel->AddChild({{0,0},{0,0},{1,0},{1,0}}, factory.MakeLabel("Hello there!"));
-    OpenDialog("Dialog Window", dialogPanel);
-}
-
-void Editor::OpenDialog(const char * title, gui::ElementPtr gui)
-{
-    auto d = std::make_shared<Window>(title, 400, 300, &window);
-    d->SetGuiRoot(gui, font, std::vector<gui::MenuItem>());
-    dialog = d;
 }
 
 int Editor::Run()
@@ -419,15 +408,13 @@ int Editor::Run()
     {
         glfwPollEvents();
 
-        if(dialog && dialog->ShouldClose()) dialog.reset();
-
         const auto t1 = glfwGetTime();
         const auto timestep = static_cast<float>(t1 - t0);
         t0 = t1;
 
         view->OnUpdate(timestep);
         window.Redraw();
-        if(dialog) dialog->Redraw();
+        docker.RedrawAll();
     }
     return 0;
 }

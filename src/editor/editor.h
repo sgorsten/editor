@@ -44,7 +44,7 @@ struct View : public gui::Element
 class Editor
 {
     Window                          window;
-    std::shared_ptr<Window>         dialog;
+    gui::DockingManager             docker;
     AssetLibrary                    assets;
     Font                            font;
     GuiFactory                      factory;
@@ -59,7 +59,6 @@ class Editor
 
     bool                            quit;
 
-    void OpenDialog(const char * title, gui::ElementPtr gui);
     void LoadScene(const std::string & filepath);
     void RefreshMenu();
     void RefreshObjectList();
