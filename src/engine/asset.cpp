@@ -1,6 +1,7 @@
 #include "asset.h"
 
 #include <vector>
+#include <iostream>
 
 struct AssetLibrary::List
 {
@@ -22,7 +23,11 @@ struct AssetLibrary::List
                 records.push_back(r);
                 return r;
             }
-            catch(...) {} // TODO: Make some sort of record
+            catch(const std::exception & e)
+            {
+                std::cerr << "Unable to load asset \'" << id << "\': " << e.what() << std::endl;
+                // TODO: Make some sort of record, so we only attempt to load an asset once
+            }
         }
 
         return {};
