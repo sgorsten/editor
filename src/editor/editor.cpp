@@ -323,7 +323,7 @@ static Mesh MakeBox(const float3 & halfDims)
 #include <sstream>
 #include <iostream>
 
-Editor::Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), docker(window, font), factory(font, 2), quit()
+Editor::Editor() : window("Editor", 1280, 720), font(window.GetNanoVG(), "../assets/Roboto-Bold.ttf", 18, true, 0x500), factory(font, 2), quit()
 {
     assets.SetLoader<Mesh>([](const std::string & id) -> Mesh
     {
@@ -386,10 +386,10 @@ layout(binding = 2) uniform PerView
     objectListPanel = std::make_shared<gui::Element>();
     propertyPanel = std::make_shared<gui::Element>();
 
-    docker.SetPrimaryElement(view);
-    docker.Dock(*view, "Property Viewer", propertyPanel, gui::Splitter::Right, 400);
-    docker.Dock(*propertyPanel, "Object List", objectListPanel, gui::Splitter::Top, 200);
-    mainPanel = docker.GetClientArea();
+    docker = std::make_shared<gui::DockingContainer>(window, font);
+    docker->SetPrimaryElement(view);
+    docker->Dock(*view, "Property Viewer", propertyPanel, gui::Splitter::Right, 400);
+    docker->Dock(*propertyPanel, "Object List", objectListPanel, gui::Splitter::Top, 200);
             
     selection.onSelectionChanged = [this]()
     {
@@ -415,7 +415,7 @@ int Editor::Run()
 
         view->OnUpdate(timestep);
         window.Redraw();
-        docker.RedrawAll();
+        docker->RedrawAll();
     }
     return 0;
 }
@@ -428,7 +428,7 @@ void Editor::LoadScene(const std::string & filepath)
 
 void Editor::RefreshMenu()
 {
-    window.SetGuiRoot(mainPanel, font, std::vector<gui::MenuItem>{
+    window.SetGuiRoot(docker, font, std::vector<gui::MenuItem>{
         gui::MenuItem::Popup("File", {
             {"New", [](){}, GLFW_MOD_CONTROL, GLFW_KEY_N},
             gui::MenuItem::Popup("Open", {

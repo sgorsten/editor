@@ -223,21 +223,18 @@ namespace gui
         Menu(gui::ElementPtr inner, const Font & font, const std::vector<MenuItem> & items);
     };
 
-    class DockingManager
+    // Allow for named panels to be "docked", and rearranged by the user
+    class DockingContainer : public gui::Element
     {
         Window & mainWindow;
         const Font & font;
-        ElementPtr clientArea;
         std::vector<std::shared_ptr<Window>> tornWindows;
-
-        void RefreshLayout() { clientArea->SetRect(clientArea->rect); }
     public:
-        DockingManager(Window & mainWindow, const Font & font) : mainWindow(mainWindow), font(font), clientArea(std::make_shared<Element>()) {}
+        DockingContainer(Window & mainWindow, const Font & font) : mainWindow(mainWindow), font(font) {}
 
-        ElementPtr GetClientArea() const { return clientArea; }
         void RedrawAll() const;
 
-        void SetPrimaryElement(ElementPtr element) { clientArea->children.clear(); clientArea->AddChild({{0,0},{0,0},{1,0},{1,0}}, element); RefreshLayout(); }
+        void SetPrimaryElement(ElementPtr element) { children.clear(); AddChild({{0,0},{0,0},{1,0},{1,0}}, element); SetRect(rect); }
         void Dock(Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels);
 
         std::shared_ptr<Window> Tear(const Rect & rect);
