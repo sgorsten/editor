@@ -44,9 +44,9 @@ struct View : public gui::Element
 class Editor
 {
     Window                          window;
-    gui::DockingManager             docker;
     AssetLibrary                    assets;
     Font                            font;
+    gui::DockingManager             docker;
     GuiFactory                      factory;
     std::shared_ptr<gui::ListBox>   objectList;
     gui::ElementPtr                 mainPanel;

@@ -578,11 +578,60 @@ namespace gui
         std::reverse(children.begin()+3, children.end());
     }
 
-    ///////////////////
-    // TearablePanel //
-    ///////////////////
+    //////////////////////
+    // DockingContainer //
+    //////////////////////
+
+    struct TearablePanel : public gui::Element
+    {
+        DockingManager & manager;
+        const Font & font;
+        std::string title;
+
+        TearablePanel(DockingManager & manager, const Font & font, const std::string & title);
+
+        gui::Element & GetClientArea() { return *children[0].element; }
+
+        NVGcolor OnDrawBackground(const DrawEvent & e) const override;
+        DraggerPtr OnClick(const MouseEvent & e) override;
+    };
+
+    struct TornPanel : public gui::Element
+    {
+        Window & window;
+        const Font & font;
+        std::string title;
+
+        TornPanel(Window & window, const Font & font, const std::string & title, gui::ElementPtr child);
+
+        NVGcolor OnDrawBackground(const DrawEvent & e) const override;
+        DraggerPtr OnClick(const MouseEvent & e) override;
+    };
 
     void DockingManager::RedrawAll() const { for(auto & window : tornWindows) window->Redraw(); }
+
+    static bool DockElement(DockingManager & manager, const Font & font, ElementPtr & candidate, Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels)
+    {
+        if(candidate.get() == &parent || candidate->children.size() == 1 && candidate->children[0].element->children.size() == 1 && candidate->children[0].element->children[0].element.get() == &parent)
+        {
+            auto panel = std::make_shared<TearablePanel>(manager, font, panelTitle);
+            panel->GetClientArea().AddChild({{0,2},{0,2},{1,-2},{1,-2}}, element);
+            candidate = std::make_shared<Splitter>(candidate, panel, side, pixels);
+            return true;
+        }
+
+        for(auto & child : candidate->children)
+        {
+            if(DockElement(manager, font, child.element, parent, panelTitle, element, side, pixels)) return true;
+        }
+
+        return false;
+    }
+
+    void DockingManager::Dock(Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels)
+    {
+        DockElement(*this, font, clientArea->children[0].element, parent, panelTitle, element, side, pixels);
+    }
 
     std::shared_ptr<Window> DockingManager::Tear(const Rect & rect)
     {

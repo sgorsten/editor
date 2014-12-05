@@ -80,13 +80,6 @@ public:
             value = assets.GetAsset<T>(text);
         });
     }
-
-    gui::ElementPtr MakeTearablePanel(gui::DockingManager & manager, const std::string & title, gui::ElementPtr element) const
-    {
-        auto panel = std::make_shared<gui::TearablePanel>(manager, font, title);
-        panel->GetClientArea().AddChild({{0,spacing},{0,spacing},{1,-spacing},{1,-spacing}}, element);
-        return panel;
-    }
 };
 
 #endif

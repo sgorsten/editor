@@ -226,39 +226,21 @@ namespace gui
     class DockingManager
     {
         Window & mainWindow;
+        const Font & font;
+        ElementPtr clientArea;
         std::vector<std::shared_ptr<Window>> tornWindows;
-    public:
-        DockingManager(Window & mainWindow) : mainWindow(mainWindow) {}
 
+        void RefreshLayout() { clientArea->SetRect(clientArea->rect); }
+    public:
+        DockingManager(Window & mainWindow, const Font & font) : mainWindow(mainWindow), font(font), clientArea(std::make_shared<Element>()) {}
+
+        ElementPtr GetClientArea() const { return clientArea; }
         void RedrawAll() const;
 
+        void SetPrimaryElement(ElementPtr element) { clientArea->children.clear(); clientArea->AddChild({{0,0},{0,0},{1,0},{1,0}}, element); RefreshLayout(); }
+        void Dock(Element & parent, const std::string & panelTitle, ElementPtr element, Splitter::Side side, int pixels);
+
         std::shared_ptr<Window> Tear(const Rect & rect);
-    };
-
-    struct TearablePanel : public gui::Element
-    {
-        DockingManager & manager;
-        const Font & font;
-        std::string title;
-
-        TearablePanel(DockingManager & manager, const Font & font, const std::string & title);
-
-        gui::Element & GetClientArea() { return *children[0].element; }
-
-        NVGcolor OnDrawBackground(const DrawEvent & e) const override;
-        DraggerPtr OnClick(const MouseEvent & e) override;
-    };
-
-    struct TornPanel : public gui::Element
-    {
-        Window & window;
-        const Font & font;
-        std::string title;
-
-        TornPanel(Window & window, const Font & font, const std::string & title, gui::ElementPtr child);
-
-        NVGcolor OnDrawBackground(const DrawEvent & e) const override;
-        DraggerPtr OnClick(const MouseEvent & e) override;
     };
 }
 
