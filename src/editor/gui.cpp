@@ -2,6 +2,7 @@
 #include "engine/gl.h"
 #include "engine/utf8.h"
 #include "engine/font.h"
+#include "window.h"
 
 #include <sstream>
 #include <algorithm>
@@ -340,15 +341,6 @@ namespace gui
         SplitterBorder(Element & panel, const DimensionDesc & dim) : panel(panel), dim(dim) {}
         Cursor GetCursor() const override { return dim.cursor; }
         DraggerPtr OnClick(const MouseEvent & e) override { return std::make_shared<Dragger>(panel, dim, e.cursor); }
-
-        NVGcolor OnDrawBackground(const DrawEvent & e) const override
-        {
-            nvgBeginPath(e.vg);
-            nvgRect(e.vg, rect.x0, rect.y0, rect.GetWidth(), rect.GetHeight());
-	        nvgFillColor(e.vg, nvgRGBA(64,64,64,255));
-	        nvgFill(e.vg);
-            return nvgRGBA(64,64,64,255);
-        }
     };
 
     Splitter::Splitter(ElementPtr panelA, ElementPtr panelB, Side sideB, int pixelsB)
@@ -556,7 +548,7 @@ namespace gui
     Menu::Menu(ElementPtr inner, const Font & font, const std::vector<MenuItem> & items)
     {
         float menuSize = 24;
-        AddChild({{0,0}, {0,0}, {1,0}, {0,menuSize}}, std::make_shared<Fill>(nvgRGBA(64,64,64,255)));
+        AddChild({{0,0}, {0,0}, {1,0}, {0,menuSize}}, std::make_shared<Fill>(nvgRGBA(32,32,32,255)));
         AddChild({{0,0}, {0,menuSize}, {1,0}, {1,0}}, inner);
 
         barrier = std::make_shared<Barrier>();
@@ -584,5 +576,109 @@ namespace gui
         }
 
         std::reverse(children.begin()+3, children.end());
+    }
+
+    ///////////////////
+    // TearablePanel //
+    ///////////////////
+
+    TearablePanel::TearablePanel(const Window & mainWindow, const Font & font, const std::string & title) : mainWindow(mainWindow), font(font), title(title) 
+    {
+        AddChild({{0,0},{0,font.GetLineHeight()+2},{1,0},{1,0}}, std::make_shared<gui::Element>());
+    }
+
+    NVGcolor TearablePanel::OnDrawBackground(const DrawEvent & e) const
+    {
+        if(children.empty()) return e.parent;
+
+        nvgBeginPath(e.vg);
+        nvgRect(e.vg, rect.x0, rect.y0, rect.GetWidth(), font.GetLineHeight()+2);
+        nvgFillColor(e.vg, nvgRGBA(64,64,64,255));
+        nvgFill(e.vg);
+
+        nvgBeginPath(e.vg);
+        nvgRect(e.vg, rect.x0, rect.y0 + font.GetLineHeight()+2, rect.GetWidth(), rect.GetHeight() - (font.GetLineHeight()+2));
+        nvgFillColor(e.vg, nvgRGBA(48,48,48,255));
+        nvgFill(e.vg);
+
+        font.DrawString(rect.x0 + 1, rect.y0 + 1, nvgRGBA(255,255,255,255), title);
+
+        return nvgRGBA(48,48,48,255);
+    }
+
+    DraggerPtr TearablePanel::OnClick(const MouseEvent & e)
+    {
+        if(e.cursor.y >= rect.y0 + font.GetLineHeight()+2 || children.empty()) return nullptr;
+
+        auto pos = mainWindow.GetPos();
+        pos.x += rect.x0 - 1;
+        pos.y += rect.y0 - 1;
+
+        glfwWindowHint(GLFW_DECORATED, 0);
+        auto win = new Window(title.c_str(), rect.GetWidth(), rect.GetHeight(), &mainWindow, pos);
+        auto child = children[0].element;
+        children.clear();
+
+        auto torn = std::make_shared<TornPanel>(*win, font, title, child);
+        win->SetGuiRoot(torn, font, std::vector<MenuItem>());
+
+        class WindowDragger : public IDragger
+        {
+            Window & window;
+            int2 oldMouse;
+        public:
+            WindowDragger(Window & window, int2 oldMouse) : window(window), oldMouse(oldMouse) {}
+            void OnDrag(int2 newMouse) override { window.SetPos(window.GetPos() + newMouse - oldMouse); oldMouse = newMouse; }
+            void OnRelease() override {}
+            void OnCancel() override {}
+        };
+
+        return std::make_shared<WindowDragger>(*win, e.cursor);
+    }
+
+    TornPanel::TornPanel(Window & window, const Font & font, const std::string & title, gui::ElementPtr child) : window(window), font(font), title(title)
+    {
+        AddChild({{0,1},{0,font.GetLineHeight()+3},{1,-1},{1,-1}}, child);
+    }
+
+    NVGcolor TornPanel::OnDrawBackground(const DrawEvent & e) const
+    {
+        nvgBeginPath(e.vg);
+        nvgRect(e.vg, rect.x0+1, rect.y0+1, rect.GetWidth()-2, font.GetLineHeight()+2);
+        nvgFillColor(e.vg, nvgRGBA(64,64,64,255));
+        nvgFill(e.vg);
+
+        nvgBeginPath(e.vg);
+        nvgRect(e.vg, rect.x0+1, rect.y0 + font.GetLineHeight()+3, rect.GetWidth()-2, rect.GetHeight() - (font.GetLineHeight()+4));
+        nvgFillColor(e.vg, nvgRGBA(48,48,48,255));
+        nvgFill(e.vg);
+
+        font.DrawString(rect.x0 + 2, rect.y0 + 2, nvgRGBA(255,255,255,255), title);
+
+        nvgBeginPath(e.vg);
+        nvgRect(e.vg, rect.x0+0.5f, rect.y0+0.5f, rect.GetWidth()-1, rect.GetHeight()-1);
+        nvgStrokeColor(e.vg, nvgRGBA(255,255,255,255));
+        nvgStrokeWidth(e.vg, 1);
+        nvgStroke(e.vg);
+
+        return nvgRGBA(48,48,48,255);
+    }
+
+    DraggerPtr TornPanel::OnClick(const MouseEvent & e)
+    {
+        if(e.cursor.y >= rect.y0 + font.GetLineHeight()+3) return nullptr;
+
+        class WindowDragger : public IDragger
+        {
+            Window & window;
+            int2 oldMouse;
+        public:
+            WindowDragger(Window & window, int2 oldMouse) : window(window), oldMouse(oldMouse) {}
+            void OnDrag(int2 newMouse) override { window.SetPos(window.GetPos() + newMouse - oldMouse); }
+            void OnRelease() override {}
+            void OnCancel() override {}
+        };
+
+        return std::make_shared<WindowDragger>(window, e.cursor);
     }
 }

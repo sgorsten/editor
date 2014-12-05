@@ -18,6 +18,8 @@ namespace gl { class Texture; }
 struct GLFWwindow;
 struct NVGcontext;
 
+class Window;
+
 namespace gui
 {
     struct IDragger
@@ -219,6 +221,32 @@ namespace gui
         std::weak_ptr<gui::Element> MakePopup(size_t level, const Font & font, const std::vector<MenuItem> & items, float x, float y);
     public:
         Menu(gui::ElementPtr inner, const Font & font, const std::vector<MenuItem> & items);
+    };
+
+    struct TearablePanel : public gui::Element
+    {
+        const Window & mainWindow;
+        const Font & font;
+        std::string title;
+
+        TearablePanel(const Window & mainWindow, const Font & font, const std::string & title);
+
+        gui::Element & GetClientArea() { return *children[0].element; }
+
+        NVGcolor OnDrawBackground(const DrawEvent & e) const override;
+        DraggerPtr OnClick(const MouseEvent & e) override;
+    };
+
+    struct TornPanel : public gui::Element
+    {
+        Window & window;
+        const Font & font;
+        std::string title;
+
+        TornPanel(Window & window, const Font & font, const std::string & title, gui::ElementPtr child);
+
+        NVGcolor OnDrawBackground(const DrawEvent & e) const override;
+        DraggerPtr OnClick(const MouseEvent & e) override;
     };
 }
 

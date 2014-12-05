@@ -385,8 +385,8 @@ layout(binding = 2) uniform PerView
 
     objectListPanel = std::make_shared<gui::Element>();
     propertyPanel = std::make_shared<gui::Element>();
-    auto topRightPanel = gui::Border::CreateBigBorder(objectListPanel);
-    auto bottomRightPanel = gui::Border::CreateBigBorder(propertyPanel);
+    auto topRightPanel = factory.MakeTearablePanel(window, "Object List", objectListPanel);
+    auto bottomRightPanel = factory.MakeTearablePanel(window, "Property Viewer", propertyPanel);
     auto rightPanel = std::make_shared<gui::Splitter>(bottomRightPanel, topRightPanel, gui::Splitter::Top, 200);
     mainPanel = std::make_shared<gui::Splitter>(view, rightPanel, gui::Splitter::Right, 400);
             

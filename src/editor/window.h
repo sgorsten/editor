@@ -45,8 +45,11 @@ class Window
     void TabTo(gui::ElementPtr element);
     void GatherShortcuts(const gui::MenuItem & item);
 public:
-    Window(const char * title, int width, int height, const Window * parent = nullptr);
+    Window(const char * title, int width, int height, const Window * parent = nullptr, int2 pos = {-1,-1});
     ~Window();
+
+    int2 GetPos() const { int2 pos; glfwGetWindowPos(window, &pos.x, &pos.y); return pos; }
+    void SetPos(const int2 & pos) { glfwSetWindowPos(window, pos.x, pos.y); }
 
     bool IsMainWindow() const { return window == context->mainWindow; }
     NVGcontext * GetNanoVG() const { return context->vg; }

@@ -43,10 +43,16 @@ void Window::TabTo(gui::ElementPtr element)
     if(focus) focus->OnTab();
 }
 
-Window::Window(const char * title, int width, int height, const Window * parent) : window(), width(width), height(height), focus()
+Window::Window(const char * title, int width, int height, const Window * parent, int2 pos) : window(), width(width), height(height), focus()
 {
     window = glfwCreateWindow(width, height, title, nullptr, parent ? parent->context->mainWindow : nullptr);
     glfwSetWindowUserPointer(window, this);
+
+    int2 newPos;
+    glfwGetWindowPos(window, &newPos.x, &newPos.y);
+    if(pos.x >= 0) newPos.x = pos.x;
+    if(pos.y >= 0) newPos.y = pos.y;
+    glfwSetWindowPos(window, newPos.x, newPos.y);
 
     context = parent ? parent->context : std::make_shared<Context>(window);
 
@@ -319,9 +325,12 @@ void Window::Redraw()
     glfwMakeContextCurrent(window);
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     glViewport(0, 0, width, height);
-    glClear(GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+    glClearColor(0.125f,0.125f,0.125f,1);
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 
     nvgBeginFrame(context->vg, width, height, 1.0f);
+
+
     DrawElement(context->vg, *root, mouseover.get(), focus.get(), nvgRGBA(0,0,0,0));
     //DrawElementBounds(context->vg, *root, mouseover.get(), focus.get());
     nvgEndFrame(context->vg);
